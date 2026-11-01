@@ -206,3 +206,33 @@ class OutcomeTests(CheckpointFixture):
         r = self.verify(report, {PRICING: original.replace('Old title', 'New title')})
         self.assertEqual(r['decision'], 'no_detected_blockers')
         self.assertEqual(r['investigation_results'][0]['evidence'], [])
+
+    def test_cta_edit_with_removed_final_newline_passes(self):
+        self.baseline[PRICING] = CONTENT + '\n'
+        (self.root/PRICING).write_text(self.baseline[PRICING])
+        result = self.verify(self.report(), {PRICING: self.candidate()})
+        self.assertEqual(result['scope_checks'][0]['status'], 'passed')
+        self.assertEqual(result['decision'], 'no_detected_blockers')
+
+    def test_cta_edit_with_added_final_newline_passes(self):
+        result = self.verify(self.report(), {PRICING: self.candidate() + '\n'})
+        self.assertEqual(result['scope_checks'][0]['status'], 'passed')
+        self.assertEqual(result['decision'], 'no_detected_blockers')
+
+    def test_trailing_newline_fix_does_not_hide_other_content_changes(self):
+        self.baseline[PRICING] = CONTENT + '\n'
+        (self.root/PRICING).write_text(self.baseline[PRICING])
+        result = self.verify(self.report(), {PRICING: self.candidate().replace('$69.90', '$9.90')})
+        self.assertEqual(result['scope_checks'][0]['status'], 'needs_review')
+        self.assertEqual(result['decision'], 'review_required')
+        self.assertIn('1 unresolved scope checks', result['summary'])
+
+    def test_final_visible_text_remains_out_of_scope(self):
+        result = self.verify(self.report(), {PRICING: self.candidate() + '\nUnrequested content\n'})
+        self.assertEqual(result['scope_checks'][0]['status'], 'needs_review')
+        self.assertEqual(result['decision'], 'review_required')
+
+    def test_trailing_blank_lines_are_formatting(self):
+        result = self.verify(self.report(), {PRICING: self.candidate() + '\r\n \t\n'})
+        self.assertEqual(result['scope_checks'][0]['status'], 'passed')
+        self.assertEqual(result['decision'], 'no_detected_blockers')

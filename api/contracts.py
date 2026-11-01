@@ -145,6 +145,12 @@ def scope_checks(contract, before, after):
                 mask_text = mask_text or id(node) in text_nodes
                 attrs = sorted((k, '<authorized-value>' if k in attr_nodes.get(id(node), set()) else v) for k, v in node.attrs.items())
                 children = [signature(c, mask_text) if isinstance(c, Node) else ('<authorized-text>' if mask_text else ' '.join(c.split())) for c in node.children]
+                # HTMLParser emits file-final newlines as root text nodes. Their
+                # presence is source formatting, not an out-of-contract edit.
+                # Keep interior text nodes and all element structure unchanged.
+                if node is tree.root:
+                    while children and children[-1] == '':
+                        children.pop()
                 return node.tag, attrs, children
             signatures.append(signature(tree.root))
         status = 'not_assessed' if ambiguous else ('passed' if signatures[0] == signatures[1] else 'needs_review')

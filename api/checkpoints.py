@@ -278,5 +278,5 @@ def verify(change_id, draft_id):
             },
             "unexpected_changes": unexpected,
             "removed_internal_links": removed_links, "decision": decision, "read_only": True,
-            "summary": f"{len(changed)} files modified; {len(unresolved)} unresolved references; {len(unexpected)} unexpected files; {len(removed_links)} unapproved removed internal links; {len(missing_destinations)} missing destinations; {len(coverage_gaps)} unassessed outcomes; {len(failed_contract)} unresolved contract checks; {len(source_regressions)} investigation groups requiring review; {len(missing_pages)} missing preview files.",
+            "summary": f"{len(changed)} files modified; {len(unresolved)} unresolved references; {len(unexpected)} unexpected files; {len(removed_links)} unapproved removed internal links; {len(missing_destinations)} missing destinations; {len(coverage_gaps)} unassessed outcomes; {len(failed_contract)} unresolved contract checks; {len(unresolved_scope)} unresolved scope checks; {len(source_regressions)} investigation groups requiring review; {len(missing_pages)} missing preview files.",
             "limitations": ["Static source checks only; browser behavior, accessibility, live routes, SEO outcomes and external knowledge are not verified.", "No publication performed."]}

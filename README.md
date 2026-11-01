@@ -216,3 +216,12 @@ context, CTA-specific accessibility investigations, and separation of factual
 consistency from truth. Prompt quality still needs live-model evaluation.
 
 See [docs/evaluation.md](docs/evaluation.md) for the evaluation scope and next steps.
+
+### v0.6.1: file-final whitespace
+
+The parsed-scope comparison now ignores whitespace-only text nodes at the end
+of the document root. A CTA edit plus an added/removed final newline no longer
+produces an out-of-contract warning. Interior nodes, element structure and
+visible content remain part of the comparison. Verification summaries now count
+unresolved scope checks explicitly. Existing analysis/draft IDs can be verified
+again after updating the API; no new draft or model call is needed.
