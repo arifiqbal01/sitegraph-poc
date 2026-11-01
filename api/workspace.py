@@ -33,7 +33,7 @@ def draft(description, change_id=None):
         from . import checkpoints
         impact = checkpoints.load(change_id)["report"]
         context["mandatory_impact_context"] = impact
-        context["instruction"] = "Address all confirmed references in permitted editable files; disclose unsupported knowledge edits."
+        context["instruction"] = "For navigation href changes, edit only explicitly targeted pages; related links are context, not mandatory edits. For pricing/content changes, address all confirmed relevant references in permitted editable files; disclose unsupported knowledge edits."
 
     result = ai.propose_edits(description,files,context)
     edits = result.get("edits",[])
