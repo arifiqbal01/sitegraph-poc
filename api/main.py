@@ -2,12 +2,13 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
 from . import graph, workspace, ai, checkpoints
-app = FastAPI(title="SiteGraph Change Impact POC", version="0.4.0")
+app = FastAPI(title="SiteGraph Change Impact POC", version="0.5.0")
 
 class AgentProposal(BaseModel):
     agent: str = "sherpa-simulator"
     trigger: str = "agent_discovery"
     original_request: str | None = None
+    use_ai: bool = False
     proposed_changes: list[dict[str, Any]] = Field(min_length=1)
 
 class Verification(BaseModel):
