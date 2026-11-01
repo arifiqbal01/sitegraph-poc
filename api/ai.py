@@ -11,7 +11,7 @@ def complete(system, user):
         raise ValueError("LLM_API_URL must use HTTPS")
     payload = {"model":os.getenv("LLM_MODEL","gpt-4o-mini"),"temperature":0,
                "messages":[{"role":"system","content":system},{"role":"user","content":user}]}
-    req = request.Request(url,json.dumps(payload).encode(),{"Authorization":"Bearer "+key,"Content-Type":"application/json"})
+    req = request.Request(url,json.dumps(payload).encode(),{"Authorization":"Bearer "+key,"Content-Type":"application/json","User-Agent":"SiteGraph-POC/0.3"})
     with request.urlopen(req,timeout=45) as response:
         return json.load(response)["choices"][0]["message"]["content"]
 def structured(system, data):

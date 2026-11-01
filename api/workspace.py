@@ -19,7 +19,7 @@ def allowed(path):
     if not actual.is_relative_to((SOURCE / "pages").resolve()) or not actual.is_file():
         raise ValueError("File is not an existing demo page: " + path)
     return actual
-def draft(description):
+def draft(description, change_id=None):
     graph.rebuild()
     indexed = graph.snapshot()
     files = {str(p.relative_to(ROOT)):p.read_text() for p in sorted((SOURCE/"pages").rglob("*.astro"))}
@@ -29,6 +29,12 @@ def draft(description):
     matches = graph.search(next((x for x in terms if len(x)>4),"Starter"))
     planning = ai.plan(description,indexed,matches)
     context = {"plan":planning,"related_sources":graph.search(planning.get("entity","Starter"))}
+    if change_id:
+        from . import checkpoints
+        impact = checkpoints.load(change_id)["report"]
+        context["mandatory_impact_context"] = impact
+        context["instruction"] = "Address all confirmed references in permitted editable files; disclose unsupported knowledge edits."
+
     result = ai.propose_edits(description,files,context)
     edits = result.get("edits",[])
     if not isinstance(edits,list) or len(edits)>MAX_FILES:
@@ -52,8 +58,8 @@ def draft(description):
     id = uuid.uuid4().hex
     workspace = WORKSPACES / id
     workspace.mkdir(parents=True)
-    (workspace/"proposal.json").write_text(json.dumps({"description":description,"plan":planning,"edits":prepared},indent=2))
-    return {"draft_id":id,"status":"pending_review","plan":planning,
+    (workspace/"proposal.json").write_text(json.dumps({"description":description,"change_id":change_id,"plan":planning,"edits":prepared},indent=2))
+    return {"draft_id":id,"status":"pending_review","change_id":change_id,"plan":planning,
             "changes":[{"path":e["path"],"reason":e["reason"],"diff":e["diff"]} for e in prepared],
             "note":"No source files modified. Explicit apply is required."}
 def apply(id):

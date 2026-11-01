@@ -1,58 +1,58 @@
-# SiteGraph POC — Change Impact Intelligence
+# SiteGraph POC — agent-proposal change impact intelligence
 
-A **fictional Astro site** and **Dockerized FastAPI service** demonstrating an incremental website graph, optional real AI planning, reviewable AI page drafts, and read-only impact verification. This is a proposal for a possible native Sherpa enhancement, not a Sherpa integration.
+SiteGraph is a read-only impact checkpoint around an AI website editing agent. The fictional Northstar Astro site and Groq-backed demo editor simulate an external agent; **this is not a live Sherpa integration**.
 
-## Start
-
-```bash
-docker compose up --build
-```
-
-Demo site: http://localhost:4321 · API docs: http://localhost:8000/docs
-
-## AI setup (optional, bring your own key)
+## Run
 
 ```bash
-cp .env.example .env
-# Fill LLM_API_KEY, LLM_MODEL, LLM_API_URL
-docker compose up --build
+docker compose up -d --build --force-recreate
 ```
 
-Never commit `.env`. The API uses an OpenAI-compatible chat completions endpoint; provider compatibility depends on the model.
+API: http://localhost:8000/docs · Demo: http://localhost:4321
 
-## New endpoints
+Set `LLM_API_KEY`, `LLM_MODEL`, `LLM_API_URL` in a private `.env` to enable the optional demo agent. Never commit credentials.
 
-- `POST /graph/reindex`: hash-based incremental update; unchanged files are **not reparsed**.
-- `GET /graph`: cached page, knowledge and import/link graph.
-- `POST /ai/plan`: **real AI** classifies natural-language change requests, chooses relevant terms and retrieves indexed evidence.
-- `POST /ai/draft`: **real AI** generates full replacement Astro page drafts and unified diffs, without changing sources.
-- `POST /ai/apply`: after explicit approval, copies the demo pages to an **isolated preview directory** in the API container volume and applies the draft there. It does not modify the original Astro site or publish anything.
-- `POST /impact/analyze` and `POST /impact/verify`: original fixture-driven endpoints remain available.
+## Connected workflow (v0.3)
 
-For `/ai/plan` and `/ai/draft`:
+1. **Agent proposes** a change, whether prompted by a human, analytics investigation, or autonomous broken-link detection.
+2. **POST /impact/analyze** accepts `proposed_changes`, discovers confirmed literal references and incoming links, and persists a baseline with a `change_id`. It does not modify files.
+3. **POST /ai/draft** with `description` and `change_id` simulates the external editor, passing the impact report as mandatory context. Returns reviewable diffs and `draft_id`.
+4. **POST /ai/apply** with `draft_id` writes an isolated preview, never the live demo sources.
+5. **POST /impact/verify** with `change_id` and `draft_id` compares original proposal, baseline and applied preview, reporting changed files, missed references, unexpected changes, removed internal links, and review decision.
+
+Example pre-change proposal:
 
 ```json
-{"description":"Reduce the Starter plan price from $29.90 to $19.90 per month on all relevant pages; do not change Growth."}
+{
+  "agent": "sherpa-simulator",
+  "trigger": "human_request",
+  "original_request": "Make Starter more affordable",
+  "proposed_changes": [{
+    "action": "update",
+    "target": "/pricing",
+    "entity": "Starter",
+    "field": "monthly_price",
+    "old_value": "$29.90",
+    "new_value": "$19.90",
+    "reason": "Proposed pricing adjustment"
+  }]
+}
 ```
 
-For `/ai/apply`, pass the `draft_id` returned by `/ai/draft`:
+For an autonomous fix, use `"trigger":"agent_discovery"` and describe the agent's intended route/link modification in `proposed_changes`. No human request is required.
 
 ```json
-{"draft_id":"<draft_id>"}
+{"description":"Change Starter price from $29.90 to $19.90 across all confirmed affected pages","change_id":"<change_id>"}
 ```
 
-Inspect the returned unified diffs **before** applying. The preview is stored in the persistent `sitegraph_data` Docker volume; it is not served by the Astro dev server in this version. This is intentionally an approval-gated draft workflow, not autonomous production editing.
+Pass that to `/ai/draft`; then apply the returned draft ID and verify:
 
-## How the graph works
-
-The first index reads `demo-site/src` and `knowledge` once, stores nodes and link/import edges in SQLite, and records SHA-256 hashes. Subsequent calls compare file hashes and only reparse changed files; deleted files are removed. Natural-language AI planning queries the stored index, not a full source reparse. Currently this is a **small static graph**; it does not infer dynamic imports, CMS relationships or business-entity equivalence. Those require later work.
-
-## Current limitations
-
-No Playwright/axe-core yet. No automatic integration of AI drafts into `/impact/verify` yet; the existing verification endpoint still uses predefined scenarios. AI draft edits are limited to existing `demo-site/src/pages/*.astro` files. No Astro compilation test or browser preview is run on drafts yet; review the diff and test before any manual publication. Model output is untrusted, and the preview is isolated. AI usage incurs provider costs.
-
-## Tests
-
-```bash
-python -m unittest discover -s tests -v
+```json
+{"change_id":"<change_id>","draft_id":"<draft_id>"}
 ```
+
+## Scope and limitations
+
+The source graph is persisted in SQLite. Reindexing reads files to compare hashes but reparses only changed files. Pre-impact checks use literal references and static internal links, not semantic equivalence or a full dependency resolver. Business knowledge is limited to the included local markdown files. Draft editing supports existing Astro pages only, so knowledge changes are correctly reported as unresolved when applicable. No browser/axe checks, live route checks, runtime SEO validation, Astro build validation, or actual analytics integration are implemented. The preview is **not served** by Astro. Verification does not prove a change achieved its business goal; it reports source-level evidence only. Existing `/ai/plan` remains a demo agent tool, not SiteGraph's impact authority.
+
+Run tests locally with `python -m unittest discover -s tests -v`.
