@@ -1,0 +1,14 @@
+services:
+  site:
+    build:
+      context: .
+      dockerfile: Dockerfile.astro
+    ports: ["4321:4321"]
+  impact:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports: ["8000:8000"]
+    env_file:
+      - path: .env
+        required: false
