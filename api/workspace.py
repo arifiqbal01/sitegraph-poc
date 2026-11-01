@@ -19,7 +19,7 @@ def allowed(path):
     if not actual.is_relative_to((SOURCE / "pages").resolve()) or not actual.is_file():
         raise ValueError("File is not an existing demo page: " + path)
     return actual
-def draft(description, change_id=None):
+def draft(description, change_id=None, implementation_contract=None):
     graph.rebuild()
     indexed = graph.snapshot()
     files = {str(p.relative_to(ROOT)):p.read_text() for p in sorted((SOURCE/"pages").rglob("*.astro"))}
@@ -27,14 +27,27 @@ def draft(description, change_id=None):
         raise ValueError("Demo exceeds bounded edit scope")
     terms = description.split()
     matches = graph.search(next((x for x in terms if len(x)>4),"Starter"))
-    planning = ai.plan(description,indexed,matches)
-    context = {"plan":planning,"related_sources":graph.search(planning.get("entity","Starter"))}
+    context = {}
+    bound_contract = None
+    if implementation_contract is not None and not change_id:
+        raise ValueError("A contract requires a change_id and saved baseline")
     if change_id:
         from . import checkpoints
-        impact = checkpoints.load(change_id)["report"]
+        record = checkpoints.load(change_id)
+        impact = record["report"]
+        if any(record["baseline"].get(path) != content for path, content in files.items()) or any(path.startswith("demo-site/src/pages/") and path not in files for path in record["baseline"]):
+            raise ValueError("Source changed since analysis; create a new analysis")
+        saved_contract = impact.get("implementation_contract")
+        if saved_contract is not None and implementation_contract is not None and saved_contract != implementation_contract:
+            raise ValueError("Cannot override the analysis contract; create a new analysis")
+        bound_contract = checkpoints.validate_contract(saved_contract if saved_contract is not None else implementation_contract, record["baseline"], impact["proposed_changes"])
+        if bound_contract:
+            context["implementation_contract"] = bound_contract
         context["mandatory_impact_context"] = impact
-        context["instruction"] = "For navigation href changes, edit only explicitly targeted pages; related links are context, not mandatory edits. For pricing/content changes, address all confirmed relevant references in permitted editable files; disclose unsupported knowledge edits."
+        context["instruction"] = "For navigation href changes, edit only explicitly targeted pages; related links are context, not mandatory edits. The explicit implementation_contract, if supplied, defines edit scope and preservation requirements. Related pricing references need updates only when a value change is explicitly authorized. Do not change prices or knowledge policy for a presentation-only request. Disclose unsupported knowledge edits."
 
+    planning = ai.plan(description,indexed,matches)
+    context.update(plan=planning, related_sources=graph.search(planning.get("entity", "Starter")))
     result = ai.propose_edits(description,files,context)
     edits = result.get("edits",[])
     if not isinstance(edits,list) or len(edits)>MAX_FILES:
@@ -58,8 +71,9 @@ def draft(description, change_id=None):
     id = uuid.uuid4().hex
     workspace = WORKSPACES / id
     workspace.mkdir(parents=True)
-    (workspace/"proposal.json").write_text(json.dumps({"description":description,"change_id":change_id,"plan":planning,"edits":prepared},indent=2))
+    (workspace/"proposal.json").write_text(json.dumps({"description":description,"change_id":change_id,"implementation_contract":bound_contract,"plan":planning,"edits":prepared},indent=2))
     return {"draft_id":id,"status":"pending_review","change_id":change_id,"plan":planning,
+            "implementation_contract":bound_contract,
             "changes":[{"path":e["path"],"reason":e["reason"],"diff":e["diff"]} for e in prepared],
             "note":"No source files modified. Explicit apply is required."}
 def apply(id):

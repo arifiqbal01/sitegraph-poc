@@ -1,0 +1,63 @@
+{
+  "agent": "sherpa-simulator",
+  "trigger": "human_request",
+  "original_request": "Change only the Starter pricing CTA to Learn more about Starter. Preserve the FAQ destination, price, features and other content.",
+  "use_ai": true,
+  "proposed_changes": [
+    {
+      "action": "update",
+      "target": "/pricing",
+      "entity": "Starter",
+      "field": "pricing_presentation",
+      "reason": "Clarify CTA copy without changing business facts or navigation."
+    }
+  ],
+  "implementation_contract": {
+    "allowed_edit_files": ["demo-site/src/pages/pricing.astro"],
+    "checks": [
+      {
+        "id": "starter-cta-copy",
+        "kind": "text_equals",
+        "file": "demo-site/src/pages/pricing.astro",
+        "locator": {
+          "tag": "a",
+          "attributes": {"class": "button"},
+          "within": {"tag": "section", "attributes": {"aria-labelledby": "starter-heading"}}
+        },
+        "expected": "Learn more about Starter"
+      },
+      {
+        "id": "starter-cta-destination",
+        "kind": "attribute_equals",
+        "file": "demo-site/src/pages/pricing.astro",
+        "locator": {
+          "tag": "a",
+          "attributes": {"class": "button"},
+          "within": {"tag": "section", "attributes": {"aria-labelledby": "starter-heading"}}
+        },
+        "attribute": "href",
+        "expected": "/faq"
+      },
+      {
+        "id": "starter-price-preserved",
+        "kind": "literal_preserved",
+        "file": "demo-site/src/pages/pricing.astro",
+        "expected": "$29.90"
+      },
+      {
+        "id": "starter-features-preserved",
+        "kind": "element_unchanged",
+        "file": "demo-site/src/pages/pricing.astro",
+        "locator": {
+          "tag": "ul",
+          "within": {"tag": "section", "attributes": {"aria-labelledby": "starter-heading"}}
+        }
+      },
+      {
+        "id": "pricing-policy-preserved",
+        "kind": "file_unchanged",
+        "file": "knowledge/pricing.md"
+      }
+    ]
+  }
+}
