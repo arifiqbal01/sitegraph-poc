@@ -9,6 +9,10 @@ services:
       context: .
       dockerfile: Dockerfile.api
     ports: ["8000:8000"]
+    volumes:
+      - sitegraph_data:/app/data
     env_file:
       - path: .env
         required: false
+volumes:
+  sitegraph_data:

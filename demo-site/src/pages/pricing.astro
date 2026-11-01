@@ -1,4 +1,21 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-<Base title="Pricing"><h1>Simple pricing</h1><h2>Starter</h2><p>Starter is $29.90 per month.</p><a class="button" href="/faq">Read pricing FAQ</a></Base>
+<Base title="Pricing">
+  <h1>Clear plans for growing teams</h1>
+  <p>Choose a plan that matches your work today. All prices shown in USD; subscription billing is monthly.</p>
+  <section aria-labelledby="starter-heading">
+    <h2 id="starter-heading">Starter</h2>
+    <p>Starter is $29.90 per month. Ideal for freelancers and teams beginning to centralize their operations.</p>
+    <ul><li>Up to three team members</li><li>Project tracking and task assignments</li><li>Basic client management</li><li>Email support</li></ul>
+    <a class="button" href="/faq">Starter plan questions</a>
+  </section>
+  <section aria-labelledby="growth-heading">
+    <h2 id="growth-heading">Growth</h2>
+    <p>Growth is $69.90 per month and adds expanded reporting and team collaboration.</p>
+    <ul><li>Up to fifteen team members</li><li>Advanced reporting dashboards</li><li>Reusable project templates</li><li>Priority email support</li></ul>
+  </section>
+  <h2>What happens when you upgrade?</h2>
+  <p>Your projects and client records stay in place. Contact our team before switching billing arrangements.</p>
+  <p>See the <a href="/faq">billing FAQ</a> for cancellation and renewal details.</p>
+</Base>

@@ -1,35 +1,58 @@
-# SiteGraph POC — Change Impact Intelligence for AI website agents
+# SiteGraph POC — Change Impact Intelligence
 
-Read-only, two-checkpoint demonstration of a **possible native Sherpa AI enhancement**. The fixture is fictional and does not integrate with Sherpa.
+A **fictional Astro site** and **Dockerized FastAPI service** demonstrating an incremental website graph, optional real AI planning, reviewable AI page drafts, and read-only impact verification. This is a proposal for a possible native Sherpa enhancement, not a Sherpa integration.
 
-## Docker
+## Start
 
 ```bash
 docker compose up --build
 ```
 
-Astro demo: http://localhost:4321 · API docs: http://localhost:8000/docs
+Demo site: http://localhost:4321 · API docs: http://localhost:8000/docs
 
-Use `POST /impact/analyze` (agent-facing) and `POST /impact/verify` (human-facing) with:
+## AI setup (optional, bring your own key)
 
-```json
-{"description":"Reduce Starter plan price from $29.90 to $19.90 per month","type":"pricing","entity":"Starter","old_value":"$29.90","new_value":"$19.90","scenario":"pricing-incomplete","use_ai":false}
+```bash
+cp .env.example .env
+# Fill LLM_API_KEY, LLM_MODEL, LLM_API_URL
+docker compose up --build
 ```
 
-Pre-change analysis finds homepage, pricing page, FAQ and company knowledge as relevant context. Candidate changes homepage and pricing, but not FAQ, so post-change verification requests review. Set scenario to `pricing-complete` for a pass; use scenario `navigation-removed` and description "Simplify services navigation" for link removal detection.
+Never commit `.env`. The API uses an OpenAI-compatible chat completions endpoint; provider compatibility depends on the model.
 
-## Optional live AI
+## New endpoints
 
-Copy `.env.example` to `.env`, enter `LLM_API_KEY` and set `"use_ai":true` in requests. Never commit the key. AI adds concise interpretation; source evidence and findings remain deterministic.
+- `POST /graph/reindex`: hash-based incremental update; unchanged files are **not reparsed**.
+- `GET /graph`: cached page, knowledge and import/link graph.
+- `POST /ai/plan`: **real AI** classifies natural-language change requests, chooses relevant terms and retrieves indexed evidence.
+- `POST /ai/draft`: **real AI** generates full replacement Astro page drafts and unified diffs, without changing sources.
+- `POST /ai/apply`: after explicit approval, copies the demo pages to an **isolated preview directory** in the API container volume and applies the draft there. It does not modify the original Astro site or publish anything.
+- `POST /impact/analyze` and `POST /impact/verify`: original fixture-driven endpoints remain available.
+
+For `/ai/plan` and `/ai/draft`:
+
+```json
+{"description":"Reduce the Starter plan price from $29.90 to $19.90 per month on all relevant pages; do not change Growth."}
+```
+
+For `/ai/apply`, pass the `draft_id` returned by `/ai/draft`:
+
+```json
+{"draft_id":"<draft_id>"}
+```
+
+Inspect the returned unified diffs **before** applying. The preview is stored in the persistent `sitegraph_data` Docker volume; it is not served by the Astro dev server in this version. This is intentionally an approval-gated draft workflow, not autonomous production editing.
+
+## How the graph works
+
+The first index reads `demo-site/src` and `knowledge` once, stores nodes and link/import edges in SQLite, and records SHA-256 hashes. Subsequent calls compare file hashes and only reparse changed files; deleted files are removed. Natural-language AI planning queries the stored index, not a full source reparse. Currently this is a **small static graph**; it does not infer dynamic imports, CMS relationships or business-entity equivalence. Those require later work.
+
+## Current limitations
+
+No Playwright/axe-core yet. No automatic integration of AI drafts into `/impact/verify` yet; the existing verification endpoint still uses predefined scenarios. AI draft edits are limited to existing `demo-site/src/pages/*.astro` files. No Astro compilation test or browser preview is run on drafts yet; review the diff and test before any manual publication. Model output is untrusted, and the preview is isolated. AI usage incurs provider costs.
 
 ## Tests
 
 ```bash
 python -m unittest discover -s tests -v
 ```
-
-## Honest limitations
-
-Static Astro fixture and heuristic business entity matches only; no full AST dependency resolution, no external billing or document integrations, no browser/axe accessibility engine yet. Design proposals are classified for accessibility checks, but these are reported **not assessed**, not falsely passed. No legal compliance certification or SEO ranking predictions. The tool is read-only; fixture candidate edits are prewritten.
-
-The goal is to demonstrate **agent impact context before implementation** and **evidence-based human review before publishing**, not create a separate Sherpa competitor.
