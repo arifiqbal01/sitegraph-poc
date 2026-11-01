@@ -46,7 +46,7 @@ def _nav_refs(content, href):
     expected = _normalized_href(href)
     return [n for n, line in enumerate(content.splitlines(), 1)
             if any(_normalized_href(dest) == expected
-                   for dest in re.findall(r"""\\bhref\\s*=\\s*["'](/[^"'<>\\s]*)["']""", line))]
+                   for dest in re.findall(r"""\bhref\s*=\s*["'](/[^"'<>\s]*)["']""", line))]
 
 def _typed_changes(changes):
     return [c for c in changes if _is_navigation(c) and c.get("old_value") and c.get("new_value")]
