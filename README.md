@@ -12,7 +12,7 @@ API: http://localhost:8000/docs · Demo: http://localhost:4321
 
 Set `LLM_API_KEY`, `LLM_MODEL`, `LLM_API_URL` in a private `.env` to enable the optional demo agent. Never commit credentials.
 
-## Connected workflow (v0.3)
+## Connected workflow
 
 1. **Agent proposes** a change, whether prompted by a human, analytics investigation, or autonomous broken-link detection.
 2. **POST /impact/analyze** accepts `proposed_changes`, discovers confirmed literal references and incoming links, and persists a baseline with a `change_id`. It does not modify files.
@@ -56,6 +56,7 @@ Pass that to `/ai/draft`; then apply the returned draft ID and verify:
 The source graph is persisted in SQLite. Reindexing reads files to compare hashes but reparses only changed files. Pre-impact checks use literal references and static internal links, not semantic equivalence or a full dependency resolver. Business knowledge is limited to the included local markdown files. Draft editing supports existing Astro pages only, so knowledge changes are correctly reported as unresolved when applicable. No browser/axe checks, live route checks, runtime SEO validation, Astro build validation, or actual analytics integration are implemented. The preview is **not served** by Astro. Verification does not prove a change achieved its business goal; it reports source-level evidence only. Existing `/ai/plan` remains a demo agent tool, not SiteGraph's impact authority.
 
 Run tests locally with `python -m unittest discover -s tests -v`.
+Install `python -m pip install -r api/requirements.txt httpx` to include the HTTP workflow test; otherwise that one test is skipped. CI installs these dependencies.
 
 ## v0.5: optional evidence-grounded impact brief
 
@@ -104,9 +105,8 @@ the verification result. Accessibility and checkout recommendations carry
 `execution_status: "not_run"`; neither check is implemented here.
 
 Vague proposals can now receive implementation guidance, but verifying a price
-replacement still requires explicit old/new values. A static
-`no_detected_blockers` result does not resolve ambiguous intent or an unavailable
-AI brief.
+replacement still requires explicit old/new values. An unavailable AI brief is disclosed separately. As of v0.6, an unassessed
+requested source-edit outcome requires review; see the contract workflow below.
 
 ### Regression evaluation
 
@@ -129,3 +129,90 @@ otherwise expected file remain limitations.
 AI tests use mocked responses: they validate orchestration and citation rejection,
 not live model quality. A live configured-provider run and rendered/browser
 checks remain separate evaluation work. No real Sherpa integration is present.
+
+## v0.6: verify explicit outcomes, not just changed files
+
+A vague proposal with no old/new pair previously returned `no_detected_blockers`
+when the pricing page merely changed. It now returns `review_required` unless
+an explicit outcome is observed. `outcome_checks` explains the gap. Old analysis
+records remain readable; their next verification uses the stricter rule.
+
+Use [scenarios/cta-contract.json](scenarios/cta-contract.json) as the complete
+`POST /impact/analyze` request for the Starter CTA demonstration. Set `use_ai`
+to false to test without an LLM. Then pass its `change_id` to `/ai/draft`:
+
+```json
+{
+  "description": "Apply the saved implementation contract exactly: change the Starter CTA to Learn more about Starter and preserve all other content.",
+  "change_id": "<returned change_id>"
+}
+```
+
+Review the diff, apply the draft to the isolated preview, then verify as before.
+The valid result has passed contract, outcome and parsed-scope checks. A wrong
+CTA, changed destination, changed price/features, ambiguous target or unrelated
+same-page edit requires review.
+
+A contract can also be supplied explicitly to `/ai/draft` when the saved analysis
+has none. It is persisted with that draft and returned for review; natural-language
+instructions alone are not converted into authorization. An analysis contract
+cannot be replaced or relaxed by a draft. Create a new analysis to revise it.
+Draft creation rejects a page baseline that drifted since analysis.
+
+Contracts contain `allowed_edit_files` and `checks`. Supported checks:
+
+| Kind | Assertion |
+| --- | --- |
+| `text_equals` | Exact normalized source text of one literal element |
+| `attribute_equals` | Exact literal attribute of one element |
+| `element_unchanged` | Parsed element structure/content preserved |
+| `literal_preserved` | Exact source-literal occurrence count preserved |
+| `file_unchanged` | Entire supplied baseline file unchanged |
+
+Each check has a unique `id`, existing `file`, and kind-specific fields. Element
+locators use a literal `tag`, optional exact `attributes`, and an optional
+`within` ancestor locator. They must identify exactly one baseline element.
+Avoid including the attribute being changed in the locator. Dynamic Astro
+expressions require rendered verification and cannot establish these assertions.
+For multiple proposed changes, set the zero-based `change_index` on outcome
+checks; it defaults to 0 and must match that change's target file. One outcome
+cannot automatically satisfy every proposal on the same page.
+
+Only an observed text/attribute change or verified explicit old/new replacement
+establishes an edit outcome. Invariant checks alone do not prove completion.
+`scope_checks` compare parsed source outside declared text/attribute changes.
+This comparison is conservative, may require review for legitimate restructuring,
+and ignores comments and attribute order. It is not a byte-perfect or rendered
+DOM comparison. Components, styles and shared layouts outside the page snapshot
+remain outside this check.
+
+### Impact investigations and human review
+
+`impact_investigations` records proposal-selected work before editing.
+`investigation_results` reports execution and coverage afterwards:
+
+| Domain | Implemented evidence | Explicitly unverified |
+| --- | --- | --- |
+| SEO | New source heading, Base title-property, robots noindex and literal metadata changes | Rendered head, indexing, traffic, ranking, live routing |
+| Accessibility | New literal unnamed links/buttons, missing image alt, unresolved local ARIA label references | Computed names, contrast, keyboard, browser/axe results |
+| Facts | Caller-specified source preservation assertions | Real-world truth or authoritative external facts |
+| Business | Existing pricing consistency plus explicit preservation assertions | Approval, policy authority, live checkout, revenue impact |
+
+Source indicators are review signals, not certified violations. Existing source
+issues are not reported as newly introduced regressions. Source-only checks can
+miss dynamic/component behavior, and local ARIA references may resolve after
+rendering. Rendered checks remain `not_run`; facts/business without explicit
+invariants remain `not_assessed`. These optional coverage gaps are disclosed,
+while an unassessed requested edit outcome always blocks a clean result. Explicit
+fields for contrast, keyboard, accessibility compliance, ranking, indexability,
+fact accuracy, checkout, approval, conversions or performance cannot be satisfied
+by source assertions alone. Field-name detection is a bounded heuristic, not a
+complete natural-language understanding of every business goal.
+
+`human_report` groups verified assertion IDs, review reasons and unassessed work.
+It is a compact explanation of the evidence, not a publication approval.
+AI impact prompts now explicitly request conditional homepage/FAQ pricing
+context, CTA-specific accessibility investigations, and separation of factual
+consistency from truth. Prompt quality still needs live-model evaluation.
+
+See [docs/evaluation.md](docs/evaluation.md) for the evaluation scope and next steps.

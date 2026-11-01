@@ -7,7 +7,7 @@ from api import checkpoints as cp, workspace, graph
 
 PAGE = 'demo-site/src/pages/'
 
-class CheckpointTests(unittest.TestCase):
+class CheckpointFixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -59,6 +59,8 @@ class CheckpointTests(unittest.TestCase):
                     p.write_text(value)
         return cp.verify(report['change_id'], draft_id)
 
+
+class CheckpointTests(CheckpointFixture):
     def test_scoped_navigation_passes(self):
         report = self.analyze()
         result = self.verify(report, {PAGE+'index.astro': self.baseline[PAGE+'index.astro'].replace('"/services"', '"/services/seo"')})
@@ -143,3 +145,15 @@ class CheckpointTests(unittest.TestCase):
         self.assertEqual(report['implementation_brief']['status'], 'unavailable')
         self.assertTrue(report['confirmed_references'])
         self.assertEqual(self.verify(report)['decision'], 'review_required')
+
+    def test_mixed_changes_do_not_authorize_context_navigation_edits(self):
+        report = cp.analyze({'proposed_changes': [
+            {'target': '/', 'field': 'internal_link', 'old_value': '/services', 'new_value': '/services/seo'},
+            {'target': '/services/seo', 'field': 'content', 'old_value': '<h1>SEO</h1>', 'new_value': '<h1>Search</h1>'}
+        ]})
+        edits = {PAGE+'index.astro': self.baseline[PAGE+'index.astro'].replace('"/services"', '"/services/seo"'),
+                 PAGE+'faq.astro': self.baseline[PAGE+'faq.astro'].replace('"/services"', '"/services/seo"'),
+                 PAGE+'services/seo.astro': '<h1>Search</h1>'}
+        r = self.verify(report, edits)
+        self.assertIn(PAGE+'faq.astro', r['unexpected_changes'])
+        self.assertEqual(r['decision'], 'review_required')
