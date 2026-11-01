@@ -56,3 +56,76 @@ Pass that to `/ai/draft`; then apply the returned draft ID and verify:
 The source graph is persisted in SQLite. Reindexing reads files to compare hashes but reparses only changed files. Pre-impact checks use literal references and static internal links, not semantic equivalence or a full dependency resolver. Business knowledge is limited to the included local markdown files. Draft editing supports existing Astro pages only, so knowledge changes are correctly reported as unresolved when applicable. No browser/axe checks, live route checks, runtime SEO validation, Astro build validation, or actual analytics integration are implemented. The preview is **not served** by Astro. Verification does not prove a change achieved its business goal; it reports source-level evidence only. Existing `/ai/plan` remains a demo agent tool, not SiteGraph's impact authority.
 
 Run tests locally with `python -m unittest discover -s tests -v`.
+
+## v0.5: optional evidence-grounded impact brief
+
+Add `"use_ai": true` to `/impact/analyze` to request an advisory implementation
+brief using the existing `LLM_*` configuration. It defaults to false, so static
+analysis and regression tests work without credentials. This is separate from
+the editing simulator's `/ai/plan` endpoint.
+
+For example, submit a business-level request without inventing a price:
+
+```json
+{
+  "agent": "external_agent",
+  "trigger": "human_request",
+  "original_request": "Make Starter more competitive and improve its pricing CTA",
+  "use_ai": true,
+  "proposed_changes": [{
+    "action": "update",
+    "target": "/pricing",
+    "entity": "Starter",
+    "field": "pricing_presentation",
+    "reason": "Investigate options; new price requires confirmation"
+  }]
+}
+```
+
+`implementation_brief` contains the interpreted intent, proposed investigations,
+uncertainties, and source citations. Investigations classify references as
+`requires_edit`, `potentially_impacted`, or `context_only`; these are advisory
+model judgments, not authorization. Every citation must match an exact quotation
+on a supplied baseline line. Invalid responses are rejected as a whole. Exact
+citation matching does **not** validate the model's reasoning or establish that
+a policy is authoritative. Knowledge-policy edits require human confirmation.
+
+The model receives at most 60,000 characters of source evidence (individual
+lines capped at 1,000 characters), with truncation disclosed. This bounded POC
+uses a supplied source bundle, not an autonomous retrieval agent. Source and
+proposal text are treated as untrusted data; prompt injection resilience is not
+proven by this implementation.
+
+Statuses are `disabled`, `completed`, or `unavailable`. Provider errors and
+invalid evidence produce an explicit unavailable status while retaining static
+analysis. Inspect that status before relying on an AI brief. AI recommendations
+never change the verifier's expected edits, grant write permissions, or decide
+the verification result. Accessibility and checkout recommendations carry
+`execution_status: "not_run"`; neither check is implemented here.
+
+Vague proposals can now receive implementation guidance, but verifying a price
+replacement still requires explicit old/new values. A static
+`no_detected_blockers` result does not resolve ambiguous intent or an unavailable
+AI brief.
+
+### Regression evaluation
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The suite uses temporary baseline files, SQLite indexes, snapshots and previews;
+it does not depend on old manual change IDs, Docker volumes or an LLM key.
+GitHub Actions runs it on pushes and pull requests. Coverage includes scoped
+navigation success, related links left unchanged, authorized removal, missing
+destinations, no-op edits, pricing omissions in FAQ and knowledge, unrelated
+changes, missing preview files, snapshot/draft identity, and invalid AI evidence.
+
+The v0.5 verifier also reports an unknown navigation target for review, detects
+missing preview pages, and treats edits to context-only navigation pages as
+unexpected. Multiple identical link occurrences and unintended edits inside an
+otherwise expected file remain limitations.
+
+AI tests use mocked responses: they validate orchestration and citation rejection,
+not live model quality. A live configured-provider run and rendered/browser
+checks remain separate evaluation work. No real Sherpa integration is present.

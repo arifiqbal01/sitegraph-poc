@@ -91,6 +91,8 @@ def analyze(proposal):
               "incoming_links": incoming, "intended_edit_files": intended, "related_routes": related, "analysis_categories": sorted(categories),
               "recommended_checks": checks, "read_only": True,
               "limitations": ["Literal source matching is not semantic entity resolution.", "Runtime, analytics, accessibility and external systems have not been verified.", "Knowledge access is limited to locally supplied demo files."]}
+    from .reasoning import implementation_brief
+    report["implementation_brief"] = implementation_brief(proposal, baseline)
     STORE.mkdir(parents=True, exist_ok=True)
     (STORE / (change_id + ".json")).write_text(json.dumps({"report": report, "baseline": baseline}, indent=2))
     return report
@@ -124,10 +126,12 @@ def verify(change_id, draft_id):
             candidate = preview / relative
             if candidate.is_file():
                 after[path] = candidate.read_text()
+            else:
+                after[path] = ""
     changed = sorted(p for p in before if before[p] != after[p])
     changes = report["proposed_changes"]
     nav_changes = _typed_changes(changes)
-    expected = {item["file"] for item in report["confirmed_references"]}
+    expected = {item["file"] for item in report["confirmed_references"]} if any(not _is_navigation(c) for c in changes) else set()
     intended = {_target_path(c.get("target"), before) for c in changes}
     intended.discard(None)
     checks = []
@@ -137,6 +141,7 @@ def verify(change_id, draft_id):
         target = _target_path(c.get("target"), before)
         old_href, new_href = _normalized_href(c["old_value"]), _normalized_href(c["new_value"])
         if target is None:
+            checks.append({"file": str(c.get("target", "")), "route": None, "status": "needs_review", "detail": "Target route not found"})
             destination_checks.append({"destination": new_href, "status": "not_assessed", "detail": "Target route not found"})
             continue
         original_refs = _nav_refs(before[target], old_href)
