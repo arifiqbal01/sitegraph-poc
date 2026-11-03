@@ -31,6 +31,30 @@ def compact(impact, contract, baseline):
     }
     if contract is not None:
         context['implementation_contract'] = contract
+    if impact.get('suggestion_context'):
+        import copy
+        carried = copy.deepcopy(impact['suggestion_context'])
+        evidence = carried['source_evidence']
+        carried['implementation_evidence_truncated'] = len(evidence) > 6 or any(len(e['quote']) > 500 for e in evidence)
+        carried['source_evidence'] = [dict(e, quote=e['quote'][:500]) for e in evidence[:6]]
+        carried['verification_contract'] = impact.get('suggestion_expectations')
+        context['suggestion_context'] = carried
+        context['instruction'] = (
+            'Use the supplied AI suggestions as candidate implementation scope, not business authority. '
+            'Implement in the isolated draft, preserve unrelated content, and disclose deviations. '
+            'Do not silently substitute outcomes or rewrite policy to make verification pass. '
+            'Independent analysis and verification assess the actual result; no proposal acceptance gate exists.'
+        )
+        context['impact_advisory'] = {
+            'origin': 'independent_pre_implementation_analysis_not_approval',
+            'policy_signals': impact.get('pre_implementation_safeguards', {}).get('evidence', [])[:6],
+            'investigations': [{'domain': i['domain'], 'scope': i['scope']} for i in impact.get('impact_investigations', [])],
+            'ai_brief_status': impact.get('implementation_brief', {}).get('status'),
+            'ai_observations': [{'check': i['check'], 'reason': i['reason'][:500]} for i in impact.get('implementation_brief', {}).get('investigations', [])[:6]],
+            'coverage_note': 'Bounded advisory summary; full analysis and evidence remain saved.'
+        }
+        context['workflow_instruction'] = ('Proceed with the supplied suggestions in an isolated draft without a separate acceptance step. Carry unanswered questions in notes; do not claim they were resolved. Independent verification follows implementation.')
+        context['suggestion_provenance'] = 'AI-generated proposal, not human-approved requirements or policy authority.'
     terms = {str(c[k]).casefold() for c in impact['proposed_changes']
              for k in ('entity', 'old_value', 'new_value') if c.get(k)}
     excerpts = []

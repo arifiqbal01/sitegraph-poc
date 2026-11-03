@@ -28,9 +28,12 @@ jobs:
       - run: npm ci --prefix tools
       - run: ./tools/node_modules/.bin/playwright install --with-deps chromium
       - run: python -m tools.demo --rendered
+      - run: python -m tools.workflow_demo
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: rendered-verification-reports
-          path: .sitegraph/workspaces/*/verification.json
+          path: |
+            .sitegraph/workspaces/*/verification.json
+            .sitegraph/workflows/*.json
           include-hidden-files: true

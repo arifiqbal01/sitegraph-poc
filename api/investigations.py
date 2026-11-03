@@ -12,6 +12,8 @@ DOMAINS = {
 
 
 def selected(proposal):
+    if proposal.get("independent_safeguards"):
+        return list(DOMAINS)
     text = json.dumps({'request': proposal.get('original_request'), 'changes': proposal.get('proposed_changes')}).lower()
     return [domain for domain, terms in DOMAINS.items() if any(term in text for term in terms)]
 

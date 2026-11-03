@@ -3,7 +3,7 @@ import json
 import re
 import uuid
 from pathlib import Path
-from . import graph, contracts, investigations, rendered
+from . import graph, contracts, investigations, rendered, suggestions, safeguards
 from .engine import links
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -67,6 +67,7 @@ def analyze(proposal):
     graph.rebuild()
     baseline = _files()
     changes = _targets(proposal)
+    suggestion_context = suggestions.validate_context(proposal.get("suggestion_context"), baseline)
     contract = validate_contract(proposal.get("implementation_contract"), baseline, changes)
     terms = sorted({str(v).strip() for c in changes for k in ("old_value", "entity") for v in [c.get(k)] if v and len(str(v).strip()) >= 3}, key=len, reverse=True)
     explicit = {str(c.get("target", "")).strip() for c in changes}
@@ -104,7 +105,21 @@ def analyze(proposal):
               "limitations": ["Literal source matching is not semantic entity resolution.", "Runtime, analytics, accessibility and external systems have not been verified.", "Knowledge access is limited to locally supplied demo files."]}
     from .reasoning import implementation_brief
     report["implementation_contract"] = contract
-    report["impact_investigations"] = investigations.plan(proposal, matches)
+    report["pre_implementation_safeguards"] = safeguards.analyze(changes, baseline)
+    report["suggestion_context"] = suggestion_context
+    report["suggestion_expectations"] = None
+    report["suggestion_expectation_errors"] = []
+    if suggestion_context and suggestion_context.get("verification_contract") is not None:
+        try:
+            expected = validate_contract(suggestion_context["verification_contract"], baseline, changes)
+            if set(expected["allowed_edit_files"]) - set(intended):
+                raise ValueError("AI expectation scope exceeds its proposed page targets")
+            report["suggestion_expectations"] = expected
+        except ValueError as exc:
+            report["suggestion_expectation_errors"] = [str(exc)]
+    report["expectation_provenance"] = {"implementation_contract": "caller_supplied" if contract else None,
+                                        "suggestion_expectations": "ai_generated_not_human_approved" if suggestion_context else None}
+    report["impact_investigations"] = investigations.plan(dict(proposal, independent_safeguards=True), matches)
     report["implementation_brief"] = implementation_brief(proposal, baseline)
     STORE.mkdir(parents=True, exist_ok=True)
     (STORE / (change_id + ".json")).write_text(json.dumps({"report": report, "baseline": baseline, "render_snapshot": rendered.snapshot(ROOT)}, indent=2))
@@ -118,7 +133,7 @@ def load(change_id):
         raise ValueError("Unknown change_id")
     return json.loads(path.read_text())
 
-def verify(change_id, draft_id, run_rendered=False):
+def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
     record = load(change_id)
     before = record["baseline"]
     report = record["report"]
@@ -155,6 +170,9 @@ def verify(change_id, draft_id, run_rendered=False):
     contract = validate_contract(saved_contract if saved_contract is not None else draft_contract, before, report["proposed_changes"])
     contract_checks = contracts.evaluate(contract, before, after)
     scope_checks = contracts.scope_checks(contract, before, after)
+    suggested_contract = report.get("suggestion_expectations")
+    suggestion_checks = contracts.evaluate(suggested_contract, before, after)
+    suggestion_scope = contracts.scope_checks(suggested_contract, before, after)
     changes = report["proposed_changes"]
     nav_changes = _typed_changes(changes)
     expected = {item["file"] for item in report["confirmed_references"]
@@ -223,7 +241,7 @@ def verify(change_id, draft_id, run_rendered=False):
     outcome_checks = []
     for index, change in enumerate(changes):
         target = _target_path(change.get("target"), before)
-        matching_contract = [c for c in contract_checks if c["file"] == target and c.get("outcome_change") and c.get("change_index", 0) == index]
+        matching_contract = [c for c in contract_checks + suggestion_checks if c["file"] == target and c.get("outcome_change") and c.get("change_index", 0) == index]
         literal_pair = bool(change.get("old_value") and change.get("new_value") and change["old_value"] != change["new_value"])
         literal_verified = False
         if target and literal_pair:
@@ -239,8 +257,11 @@ def verify(change_id, draft_id, run_rendered=False):
         assessed = bool(target and (literal_verified or matching_contract) and not runtime_required)
         outcome_checks.append({"change_index": index, "target": change.get("target"),
                                "status": "passed" if assessed else "not_assessed",
+                               "expectation_origin": ("caller_contract" if any(c in contract_checks for c in matching_contract) else
+                                                      "ai_generated_expectation" if matching_contract else
+                                                      "ai_suggestion_literal" if report.get("suggestion_context") else "caller_proposal_literal"),
                                "detail": "Explicit source outcome observed" if assessed else ("Requested outcome needs runtime or external evidence; source assertions are insufficient" if runtime_required else "No verified explicit outcome for proposed change; changed-file presence is insufficient")})
-    inspection = investigations.verify(report, before, after, changed, contract_checks, scope_checks)
+    inspection = investigations.verify(dict(report, independent_safeguards=True), before, after, changed, contract_checks, scope_checks)
     coverage_gaps = [x for x in outcome_checks if x["status"] != "passed"]
     failed_contract = [x for x in contract_checks if x["status"] != "passed"]
     unresolved_scope = [x for x in scope_checks if x["status"] != "passed"]
@@ -263,7 +284,30 @@ def verify(change_id, draft_id, run_rendered=False):
             if item["check"] in {"rendered_accessibility", "runtime_seo"}:
                 item["status"] = runtime.get("domain_results", {}).get(item["domain"], {}).get("status", runtime["status"])
                 item["detail"] = "See rendered_verification for executed checks, evidence and limitations."
+    policy = safeguards.policy_checks(before, after)
+    independent_review = safeguards.review(report.get("original_request"), before, after, changed) if run_ai_review else {
+        "status": "not_run", "advisory_only": True, "findings": [], "limitations": ["Independent semantic review was not requested."]}
+    open_questions = (report.get("suggestion_context") or {}).get("clarification_questions", [])
+    expectation_errors = report.get("suggestion_expectation_errors", [])
+    safeguard_reasons = []
+    if policy["status"] == "review_required":
+        safeguard_reasons += ["Supplied policy: " + e["code"] + " on " + e["route"] for e in policy["evidence"]]
+    if run_ai_review and (independent_review["status"] != "completed" or independent_review.get("evidence_truncated")):
+        safeguard_reasons.append("Independent AI review requires review or has incomplete evidence")
+    safeguard_reasons += ["Unanswered question: " + q for q in open_questions]
+    safeguard_reasons += ["AI expectation unavailable: " + e for e in expectation_errors]
+    if any(c["status"] != "passed" for c in suggestion_checks + suggestion_scope):
+        safeguard_reasons.append("AI-proposed expectations or proposed scope were not satisfied")
+    if safeguard_reasons:
+        decision = "review_required"
     return {"change_id": change_id, "draft_id": draft_id, "checkpoint": "pre_publish",
+            "suggestion_context": report.get("suggestion_context"),
+            "expectation_provenance": report.get("expectation_provenance"),
+            "suggestion_checks": suggestion_checks, "suggestion_scope_checks": suggestion_scope,
+            "independent_safeguards": {"policy_consistency": policy, "semantic_review": independent_review},
+            "coverage": {"caller_scope": "assessed" if contract else "not_assessed",
+                         "ai_proposed_scope": "assessed" if suggested_contract else "not_assessed",
+                         "business_truth": "not_assessed", "semantic_review": independent_review["status"]},
             "rendered_verification": runtime,
             "original_proposal": report["proposed_changes"], "affected_routes": report["affected_routes"],
             "changed_files": changed, "changed_routes": sorted(_route(p) for p in changed if p.endswith(".astro")),
@@ -275,8 +319,9 @@ def verify(change_id, draft_id, run_rendered=False):
             "human_report": {
                 "decision": decision,
                 "rendered_status": runtime["status"],
+                "ai_expectations_satisfied": [c["id"] for c in suggestion_checks if c["status"] == "passed"],
                 "verified": [c["id"] for c in contract_checks if c["status"] == "passed"],
-                "requires_review": (["Rendered verification: " + runtime["status"]] if run_rendered and runtime["status"] != "completed" else []) + [e["domain"] + ": " + e["code"] + " on " + e["route"] for e in runtime.get("evidence", [])] + [c["id"] for c in failed_contract] + [c["detail"] for c in coverage_gaps]
+                "requires_review": safeguard_reasons + (["Rendered verification: " + runtime["status"]] if run_rendered and runtime["status"] != "completed" else []) + [e["domain"] + ": " + e["code"] + " on " + e["route"] for e in runtime.get("evidence", [])] + [c["id"] for c in failed_contract] + [c["detail"] for c in coverage_gaps]
                                    + ["Unresolved reference: " + c["file"] for c in unresolved]
                                    + ["Unexpected edit: " + p for p in unexpected]
                                    + ["Missing preview file: " + p for p in missing_pages]
@@ -284,7 +329,7 @@ def verify(change_id, draft_id, run_rendered=False):
                                    + ["Missing destination: " + c["destination"] for c in missing_destinations]
                                    + ["Removed link: " + c["removed_destination"] for c in removed_links]
                                    + [e["detail"] for result in source_regressions for e in result["evidence"]],
-                "not_assessed": [x["detail"] for x in inspection if x["status"] in ("not_run", "not_assessed", "unavailable")] + runtime.get("limitations", []),
+                "not_assessed": independent_review.get("limitations", []) + ([policy["detail"]] if policy["status"] == "not_assessed" else []) + [x["detail"] for x in inspection if x["status"] in ("not_run", "not_assessed", "unavailable")] + runtime.get("limitations", []),
                 "scope": "Source assertions plus separately reported opt-in rendered evidence; business approval and publication remain human decisions."
             },
             "unexpected_changes": unexpected,
