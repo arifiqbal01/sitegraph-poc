@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
-from . import graph, workspace, ai, checkpoints
-app = FastAPI(title="SiteGraph Change Impact POC", version="0.7.1")
+from . import graph, workspace, ai, checkpoints, suggestions, workflow
+app = FastAPI(title="SiteGraph Change Impact POC", version="0.8.0")
 
 class AgentProposal(BaseModel):
     agent: str = "sherpa-simulator"
@@ -11,11 +11,13 @@ class AgentProposal(BaseModel):
     use_ai: bool = False
     implementation_contract: dict[str, Any] | None = None
     proposed_changes: list[dict[str, Any]] = Field(min_length=1)
+    suggestion_context: dict[str, Any] | None = None
 
 class Verification(BaseModel):
     change_id: str
     draft_id: str
     run_rendered: bool = False
+    run_ai_review: bool = False
 
 class Request(BaseModel):
     description: str
@@ -48,7 +50,7 @@ def impact_analyze(body: AgentProposal):
 @app.post("/impact/verify")
 def impact_verify(body: Verification):
     try:
-        return checkpoints.verify(body.change_id, body.draft_id, run_rendered=body.run_rendered)
+        return checkpoints.verify(body.change_id, body.draft_id, run_rendered=body.run_rendered, run_ai_review=body.run_ai_review)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc))
 
@@ -81,3 +83,38 @@ def ai_apply(body: ApplyRequest):
         return workspace.apply(body.draft_id)
     except Exception as exc:
         raise HTTPException(422, detail=str(exc))
+
+
+class PromptRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=6000)
+
+
+class WorkflowRequest(PromptRequest):
+    run_rendered: bool = True
+    run_ai_review: bool = True
+
+
+@app.post("/impact/propose")
+def impact_propose(body: PromptRequest):
+    try:
+        return suggestions.propose(body.prompt)
+    except ai.ModelRequestError as exc:
+        raise HTTPException(exc.status_code, detail=exc.detail)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc))
+
+
+@app.post("/workflow/run")
+def workflow_run(body: WorkflowRequest):
+    try:
+        return workflow.run(body.prompt, body.run_rendered, body.run_ai_review)
+    except workflow.WorkflowFailure as exc:
+        raise HTTPException(exc.status_code, detail=exc.record)
+
+
+@app.get("/workflow/{workflow_id}")
+def workflow_get(workflow_id: str):
+    try:
+        return workflow.load(workflow_id)
+    except ValueError as exc:
+        raise HTTPException(404, detail=str(exc))

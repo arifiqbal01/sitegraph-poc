@@ -39,7 +39,7 @@ try {
           return {violations:result.violations.map(v=>({id:v.id, impact:v.impact, description:v.description, nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),
                   incomplete:result.incomplete.map(v=>({id:v.id,targets:v.nodes.map(n=>n.target)})), passes:result.passes.length};
         });
-        const dom = await page.evaluate(() => ({title:document.title,description:document.querySelector('meta[name="description"]')?.content || '',canonical:document.querySelector('link[rel="canonical"]')?.href || '',robots:document.querySelector('meta[name="robots"]')?.content || '',h1:document.querySelectorAll('h1').length,
+        const dom = await page.evaluate(() => ({title:document.title,description:document.querySelector('meta[name="description"]')?.content || '',canonical:document.querySelector('link[rel="canonical"]')?.href || '',robots:document.querySelector('meta[name="robots"]')?.content || '',h1:document.querySelectorAll('h1').length,headings:[...document.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(n=>n.getClientRects().length).map(n=>({level:Number(n.tagName[1]),text:n.textContent.trim(),id:n.id})),
           links:[...document.querySelectorAll('a[href]')].map(a=>a.getAttribute('href')).filter(h=>h.startsWith('/')&&!h.startsWith('//')),
           facts:[...document.querySelectorAll('[data-fact]')].map(n=>({id:n.getAttribute('data-fact'),value:n.textContent.trim(),visible:!!(n.getClientRects().length)&&getComputedStyle(n).visibility!=='hidden'}))}));
         let keyboard = null;
@@ -72,6 +72,8 @@ try {
     }
     if(/noindex/i.test(candidate.seo.robots))add('seo','noindex','Rendered robots includes noindex');
     if(candidate.seo.h1!==1)add('seo','heading_structure',`Expected one h1; observed ${candidate.seo.h1}`);
+    const skipped = headings => headings.flatMap((h,i)=> i>0 && h.level>headings[i-1].level+1 ? [{previous:headings[i-1],heading:h}] : []);
+    for(const skip of skipped(candidate.seo.headings))add('accessibility','heading_level_skip',{...skip,classification:'heading outline review signal, not a blanket WCAG failure',baseline_present:skipped(baseline.seo.headings).some(b=>b.heading.id===skip.heading.id&&b.heading.text===skip.heading.text&&b.heading.level===skip.heading.level)});
     for(const d of candidate.destinations)if(d.status>=400)add('seo','broken_internal_link',d);
     for(const violation of candidate.accessibility.violations)add('accessibility',violation.id,{...violation,baseline_present:baseline.accessibility.violations.some(v=>v.id===violation.id)});
     if(candidate.keyboard&&!candidate.keyboard.reachable)add('accessibility','cta_keyboard_unreachable',candidate.keyboard);

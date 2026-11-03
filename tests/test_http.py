@@ -18,7 +18,7 @@ class HTTPWorkflowTests(unittest.TestCase):
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
         with TestClient(app) as client:
-            self.assertEqual(client.get('/openapi.json').json()['info']['version'], '0.7.1')
+            self.assertEqual(client.get('/openapi.json').json()['info']['version'], '0.8.0')
             body = {'original_request': 'Improve Starter CTA, preserve price and facts',
                     'proposed_changes': [{'target': '/pricing', 'field': 'pricing_presentation'}],
                     'implementation_contract': contract()}

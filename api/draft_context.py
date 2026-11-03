@@ -31,6 +31,16 @@ def compact(impact, contract, baseline):
     }
     if contract is not None:
         context['implementation_contract'] = contract
+    if impact.get('suggestion_context'):
+        import copy
+        carried = copy.deepcopy(impact['suggestion_context'])
+        evidence = carried['source_evidence']
+        carried['implementation_evidence_truncated'] = len(evidence) > 6 or any(len(e['quote']) > 500 for e in evidence)
+        carried['source_evidence'] = [dict(e, quote=e['quote'][:500]) for e in evidence[:6]]
+        carried['verification_contract'] = impact.get('suggestion_expectations')
+        context['suggestion_context'] = carried
+        context['workflow_instruction'] = ('Proceed with the supplied suggestions in an isolated draft without a separate acceptance step. Carry unanswered questions in notes; do not claim they were resolved. Independent verification follows implementation.')
+        context['suggestion_provenance'] = 'AI-generated proposal, not human-approved requirements or policy authority.'
     terms = {str(c[k]).casefold() for c in impact['proposed_changes']
              for k in ('entity', 'old_value', 'new_value') if c.get(k)}
     excerpts = []

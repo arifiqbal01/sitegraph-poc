@@ -2,6 +2,28 @@
 
 SiteGraph is a read-only impact checkpoint around an AI website editing agent. The fictional Northstar Astro site and Groq-backed demo editor simulate an external agent; **this is not a live Sherpa integration**.
 
+## v0.8: prompt to final human review
+
+Send `{"prompt":"Make the Starter pricing card clearer and less intimidating."}`
+to **POST /workflow/run**. AI suggestions flow automatically through independent
+impact analysis, an implementation draft, isolated application and verification.
+There is no suggestion-acceptance gate and no publication.
+
+Evidence, preservation suggestions, assumptions and unanswered questions travel
+through the workflow. AI-generated expectations are labelled separately from caller
+requirements. A satisfied AI plan cannot override supplied-policy conflicts or
+website quality findings. The final response includes diffs, a review summary,
+coverage, uncertainties and independent evidence for human review.
+
+New **POST /impact/propose** supports the individual-stage flow;
+**GET /workflow/{workflow_id}** retrieves saved results. Independent semantic review
+is advisory and checks actual sources, not the agent's self-assessment. Rendered
+heading-level skips now produce explicit review signals.
+
+See [docs/prompt-workflow.md](docs/prompt-workflow.md) for live usage, failure handling,
+provenance and limits. `python -m tools.workflow_demo` runs a clearly labelled scripted
+model demonstration with real build/browser checks.
+
 ## v0.7.1: bounded model input
 
 Drafts with a saved analysis send only explicitly proposed page targets, or the
