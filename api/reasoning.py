@@ -87,8 +87,10 @@ def implementation_brief(proposal, baseline):
         result.update(status="completed", intent=raw["intent"], investigations=validated,
                       uncertainties=uncertainties, evidence_truncated=truncated,
                       grounding="Exact citations validated; semantic relevance remains a model judgment.")
-    except Exception:
+    except Exception as exc:
         # Provider errors may contain credentials or request data; never expose them.
+        from .safeguards import review_error
+        result["error"] = review_error(exc)
         result.update(status="unavailable", uncertainties=[
             "AI analysis failed or returned invalid evidence. Use static findings and request human review."])
     return result

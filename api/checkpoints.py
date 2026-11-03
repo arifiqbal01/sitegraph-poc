@@ -110,13 +110,25 @@ def analyze(proposal):
     report["suggestion_expectations"] = None
     report["suggestion_expectation_errors"] = []
     if suggestion_context and suggestion_context.get("verification_contract") is not None:
-        try:
-            expected = validate_contract(suggestion_context["verification_contract"], baseline, changes)
-            if set(expected["allowed_edit_files"]) - set(intended):
-                raise ValueError("AI expectation scope exceeds its proposed page targets")
-            report["suggestion_expectations"] = expected
-        except ValueError as exc:
-            report["suggestion_expectation_errors"] = [str(exc)]
+        raw_contract = suggestion_context["verification_contract"]
+        valid_checks = []
+        seen_ids = set()
+        if not isinstance(raw_contract, dict) or set(raw_contract) != {"allowed_edit_files", "checks"} or not isinstance(raw_contract.get("checks"), list) or not 1 <= len(raw_contract["checks"]) <= 30:
+            report["suggestion_expectation_errors"].append("Invalid AI expectation envelope")
+        else:
+            for index, rule in enumerate(raw_contract["checks"]):
+                try:
+                    expected = validate_contract(dict(raw_contract, checks=[rule]), baseline, changes)
+                    if set(expected["allowed_edit_files"]) - set(intended):
+                        raise ValueError("AI expectation scope exceeds its proposed page targets")
+                    if rule["id"] in seen_ids:
+                        raise ValueError("Duplicate AI check id")
+                    seen_ids.add(rule["id"])
+                    valid_checks.append(rule)
+                except ValueError as exc:
+                    report["suggestion_expectation_errors"].append(f"checks[{index}]: {exc}")
+            if valid_checks:
+                report["suggestion_expectations"] = dict(raw_contract, checks=valid_checks)
     report["expectation_provenance"] = {"implementation_contract": "caller_supplied" if contract else None,
                                         "suggestion_expectations": "ai_generated_not_human_approved" if suggestion_context else None}
     report["impact_investigations"] = investigations.plan(dict(proposal, independent_safeguards=True), matches)
@@ -226,18 +238,26 @@ def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
         original = before[path]
         current = after[path]
         relevant = [c for c in changes if not _is_navigation(c) and c.get("old_value") and c.get("new_value")
+                    and (_target_path(c.get("target"), before) == path or
+                         (not report.get("suggestion_context") and c.get("field") in {"monthly_price", "price"}))
                     and str(c["old_value"]) in original]
-        if relevant:
+        if relevant and (report.get("suggestion_context") or all(c.get("field") in {"text", "html", "cta", "heading", "copy"} for c in relevant)):
+            checks.append({"file": path, "route": item["route"], "status": "reference_only",
+                           "detail": "Local content outcomes are checked separately at their declared targets; literal references are not global replacement requirements."})
+        elif relevant:
             remaining = [str(c["old_value"]) for c in relevant if str(c["old_value"]) in current]
             new_seen = all(str(c["new_value"]) in current for c in relevant)
             status = "missed" if remaining else ("updated" if new_seen else "needs_review")
             detail = "Old value remains" if remaining else ("Replacement observed" if new_seen else "Old value removed; replacement not confirmed")
             checks.append({"file": path, "route": item["route"], "status": status, "detail": detail})
+        elif path not in intended:
+            checks.append({"file": path, "route": item["route"], "status": "reference_only",
+                           "detail": "Discovered reference; no required replacement established. Policy consistency is checked independently."})
         elif not nav_changes:
             checks.append({"file": path, "route": item["route"],
                            "status": "changed" if path in changed else "not_assessed",
                            "detail": "No literal old/new pair to verify"})
-    unexpected = sorted(set(changed) - (set(contract["allowed_edit_files"]) if contract else expected | intended))
+    unexpected = sorted(set(changed) - (set(contract["allowed_edit_files"]) if contract else (intended if report.get("suggestion_context") else expected | intended)))
     outcome_checks = []
     for index, change in enumerate(changes):
         target = _target_path(change.get("target"), before)
@@ -252,15 +272,20 @@ def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
             else:
                 old, new = str(change["old_value"]), str(change["new_value"])
                 literal_verified = old in before[target] and old not in after[target] and new in after[target]
+        from .outcomes import assess
+        scoped = assess(change, before.get(target, ""), after.get(target, "")) if target else None
+        if scoped is not None:
+            literal_verified = scoped["status"] == "passed"
         field = str(change.get("field", "")).lower()
         runtime_required = any(term in field for term in ("contrast", "keyboard", "accessibility_compliance", "ranking", "indexability", "fact_accuracy", "checkout", "approval", "conversion", "performance"))
-        assessed = bool(target and (literal_verified or matching_contract) and not runtime_required)
+        assessed = bool(target and (literal_verified or matching_contract) and not runtime_required and (scoped is None or scoped["status"] == "passed"))
         outcome_checks.append({"change_index": index, "target": change.get("target"),
-                               "status": "passed" if assessed else "not_assessed",
+                               "status": "passed" if assessed else (scoped["status"] if scoped and not runtime_required else "not_assessed"),
                                "expectation_origin": ("caller_contract" if any(c in contract_checks for c in matching_contract) else
                                                       "ai_generated_expectation" if matching_contract else
                                                       "ai_suggestion_literal" if report.get("suggestion_context") else "caller_proposal_literal"),
-                               "detail": "Explicit source outcome observed" if assessed else ("Requested outcome needs runtime or external evidence; source assertions are insufficient" if runtime_required else "No verified explicit outcome for proposed change; changed-file presence is insufficient")})
+                               "evidence": scoped.get("evidence", {}) if scoped else {},
+                               "detail": "Explicit source outcome observed" if assessed else (scoped["detail"] if scoped and not runtime_required else ("Requested outcome needs runtime or external evidence; source assertions are insufficient" if runtime_required else "No verified explicit outcome for proposed change; changed-file presence is insufficient"))})
     inspection = investigations.verify(dict(report, independent_safeguards=True), before, after, changed, contract_checks, scope_checks)
     coverage_gaps = [x for x in outcome_checks if x["status"] != "passed"]
     failed_contract = [x for x in contract_checks if x["status"] != "passed"]
@@ -287,6 +312,8 @@ def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
     policy = safeguards.policy_checks(before, after)
     independent_review = safeguards.review(report.get("original_request"), before, after, changed) if run_ai_review else {
         "status": "not_run", "advisory_only": True, "findings": [], "limitations": ["Independent semantic review was not requested."]}
+    independent_review["changed_text_candidates"] = safeguards.changed_text(before, after, changed)
+    independent_review["changed_text_limitations"] = "Literal source text inventory only; not complete semantic claim extraction or evidence of a defect."
     open_questions = (report.get("suggestion_context") or {}).get("clarification_questions", [])
     expectation_errors = report.get("suggestion_expectation_errors", [])
     safeguard_reasons = []
@@ -300,6 +327,9 @@ def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
         safeguard_reasons.append("AI-proposed expectations or proposed scope were not satisfied")
     if safeguard_reasons:
         decision = "review_required"
+    from .outcomes import verified_summary
+    verified = [c["id"] for c in contract_checks if c["status"] == "passed"]
+    verified += verified_summary(runtime, policy, outcome_checks)
     return {"change_id": change_id, "draft_id": draft_id, "checkpoint": "pre_publish",
             "suggestion_context": report.get("suggestion_context"),
             "expectation_provenance": report.get("expectation_provenance"),
@@ -308,6 +338,7 @@ def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
             "coverage": {"caller_scope": "assessed" if contract else "not_assessed",
                          "ai_proposed_scope": "assessed" if suggested_contract else "not_assessed",
                          "business_truth": "not_assessed", "semantic_review": independent_review["status"]},
+            "candidate_digest": suggestions.digest(after),
             "rendered_verification": runtime,
             "original_proposal": report["proposed_changes"], "affected_routes": report["affected_routes"],
             "changed_files": changed, "changed_routes": sorted(_route(p) for p in changed if p.endswith(".astro")),
@@ -320,7 +351,7 @@ def verify(change_id, draft_id, run_rendered=False, run_ai_review=False):
                 "decision": decision,
                 "rendered_status": runtime["status"],
                 "ai_expectations_satisfied": [c["id"] for c in suggestion_checks if c["status"] == "passed"],
-                "verified": [c["id"] for c in contract_checks if c["status"] == "passed"],
+                "verified": verified,
                 "requires_review": safeguard_reasons + (["Rendered verification: " + runtime["status"]] if run_rendered and runtime["status"] != "completed" else []) + [e["domain"] + ": " + e["code"] + " on " + e["route"] for e in runtime.get("evidence", [])] + [c["id"] for c in failed_contract] + [c["detail"] for c in coverage_gaps]
                                    + ["Unresolved reference: " + c["file"] for c in unresolved]
                                    + ["Unexpected edit: " + p for p in unexpected]

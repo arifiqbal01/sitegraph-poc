@@ -67,6 +67,7 @@ def run(prompt, run_rendered=True, run_ai_review=True):
         record['review_summary'] = {
             'decision': record['decision'],
             'changed_files': verification['changed_files'],
+            'verified': verification['human_report']['verified'],
             'requires_review': list(dict.fromkeys(verification['human_report']['requires_review'])),
             'assumptions': record['proposal']['suggestion_context']['assumptions'],
             'unanswered_questions': record['proposal']['suggestion_context']['clarification_questions'],

@@ -284,3 +284,5 @@ produces an out-of-contract warning. Interior nodes, element structure and
 visible content remain part of the comparison. Verification summaries now count
 unresolved scope checks explicitly. Existing analysis/draft IDs can be verified
 again after updating the API; no new draft or model call is needed.
+
+Verifier reliability and retry guidance: [docs/verifier-reliability.md](docs/verifier-reliability.md).
