@@ -2,6 +2,19 @@
 
 SiteGraph is a read-only impact checkpoint around an AI website editing agent. The fictional Northstar Astro site and Groq-backed demo editor simulate an external agent; **this is not a live Sherpa integration**.
 
+## v0.7.1: bounded model input
+
+Drafts with a saved analysis send only explicitly proposed page targets, or the
+contract's allowed edit files. Complete target sources, the original request,
+proposed changes and full contract are retained; supporting policy excerpts are
+bounded and optional. The full saved verification baseline is unchanged.
+`input_summary` records editable files and the serialized editor request size.
+
+`LLM_MAX_INPUT_BYTES` defaults to 24000 and bounds all outgoing model request
+bodies. Optional editor excerpts are removed first; oversized required input
+returns HTTP 413 before model calls. Provider 413 and 429 are reported separately,
+without raw provider bodies or blind retries. See [docs/draft-input.md](docs/draft-input.md).
+
 ## v0.7: rendered SEO, accessibility and factual consistency
 
 The nine-page Northstar fixture now includes detailed plans, billing terms,
