@@ -86,6 +86,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(result['preview'])
         self.assertIsNone(result['draft']['implementation_contract'])
         self.assertEqual(editor.call_args.args[2]['suggestion_context']['assumptions'],['Clearer wording may help'])
+        self.assertEqual(editor.call_args.args[2]['impact_advisory']['origin'],'independent_pre_implementation_analysis_not_approval')
         self.assertEqual(result,workflow.load(result['workflow_id']))
         self.assertEqual((fixture.root/PRICING).read_text(),fixture.baseline[PRICING])
         self.assertTrue(reviewed)

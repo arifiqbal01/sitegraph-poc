@@ -86,7 +86,7 @@ Outcome checks identify their expectation_origin. Caller contract_checks and
 scope_checks remain distinct. No scope check having run is represented as
 not_assessed in coverage rather than evidence that unrelated content was preserved.
 
-Draft context carries the original prompt, changes, preservation suggestions,
+Draft context carries a bounded independent pre-impact advisory summary, the original prompt, changes, preservation suggestions,
 assumptions, unanswered questions and supported AI expectations. Implementation
 citations are bounded (six excerpts, 500 characters each), with an explicit
 implementation_evidence_truncated flag; complete proposal evidence remains in the
