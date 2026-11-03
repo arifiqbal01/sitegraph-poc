@@ -2,6 +2,30 @@
 
 SiteGraph is a read-only impact checkpoint around an AI website editing agent. The fictional Northstar Astro site and Groq-backed demo editor simulate an external agent; **this is not a live Sherpa integration**.
 
+## v0.7: rendered SEO, accessibility and factual consistency
+
+The nine-page Northstar fixture now includes detailed plans, billing terms,
+integration availability, service scope, support and data policies, with a responsive
+layout and cross-page business dependencies. It remains explicitly fictional.
+
+An opt-in runner freezes supporting sources, builds baseline and candidate
+separately, and checks all routes at desktop and mobile sizes using Playwright
+and axe. It reports rendered metadata, internal HTTP destinations, selected
+accessibility rules, CTA keyboard reachability and four marked policy facts.
+Unavailable browser evidence requires review; it never silently passes.
+
+```sh
+npm ci --prefix demo-site
+npm ci --prefix tools
+./tools/node_modules/.bin/playwright install --with-deps chromium
+python -m tools.demo --rendered
+```
+
+Five deterministic cases demonstrate correct behavior, wrong destination, noindex,
+keyboard exclusion and fact drift, without LLM calls. The optional Docker image,
+API `run_rendered` flag, evidence model and limits are documented in
+[docs/rendered-demo.md](docs/rendered-demo.md).
+
 ## Run
 
 ```bash
@@ -53,7 +77,7 @@ Pass that to `/ai/draft`; then apply the returned draft ID and verify:
 
 ## Scope and limitations
 
-The source graph is persisted in SQLite. Reindexing reads files to compare hashes but reparses only changed files. Pre-impact checks use literal references and static internal links, not semantic equivalence or a full dependency resolver. Business knowledge is limited to the included local markdown files. Draft editing supports existing Astro pages only, so knowledge changes are correctly reported as unresolved when applicable. No browser/axe checks, live route checks, runtime SEO validation, Astro build validation, or actual analytics integration are implemented. The preview is **not served** by Astro. Verification does not prove a change achieved its business goal; it reports source-level evidence only. Existing `/ai/plan` remains a demo agent tool, not SiteGraph's impact authority.
+The source graph is persisted in SQLite. Reindexing reads files to compare hashes but reparses only changed files. Pre-impact checks use literal references and static internal links, not semantic equivalence or a full dependency resolver. Business knowledge is limited to supplied local Markdown and identified JSON policy facts. Draft editing supports existing Astro pages only, so knowledge changes are correctly reported as unresolved when applicable. The default verification remains source-only. Opt-in rendered verification adds isolated Astro builds, browser/axe checks and local route responses; external live systems and analytics are not connected. The ordinary Astro development server does **not** serve candidate pages. Verification does not prove a business goal was achieved. Existing `/ai/plan` remains a demo agent tool, not SiteGraph's impact authority.
 
 Run tests locally with `python -m unittest discover -s tests -v`.
 Install `python -m pip install -r api/requirements.txt httpx` to include the HTTP workflow test; otherwise that one test is skipped. CI installs these dependencies.
@@ -193,15 +217,15 @@ remain outside this check.
 
 | Domain | Implemented evidence | Explicitly unverified |
 | --- | --- | --- |
-| SEO | New source heading, Base title-property, robots noindex and literal metadata changes | Rendered head, indexing, traffic, ranking, live routing |
-| Accessibility | New literal unnamed links/buttons, missing image alt, unresolved local ARIA label references | Computed names, contrast, keyboard, browser/axe results |
-| Facts | Caller-specified source preservation assertions | Real-world truth or authoritative external facts |
+| SEO | Source indicators; opt-in rendered metadata and local internal destinations | Search engine indexing, traffic, ranking, production routing |
+| Accessibility | Source indicators; opt-in selected axe rules and pricing CTA tab sequence | Full WCAG compliance, complete keyboard and assistive technology coverage |
+| Facts | Source invariants; opt-in marked rendered values against supplied policy | Unmarked claims, real-world truth or external authority |
 | Business | Existing pricing consistency plus explicit preservation assertions | Approval, policy authority, live checkout, revenue impact |
 
 Source indicators are review signals, not certified violations. Existing source
 issues are not reported as newly introduced regressions. Source-only checks can
 miss dynamic/component behavior, and local ARIA references may resolve after
-rendering. Rendered checks remain `not_run`; facts/business without explicit
+rendering. Rendered checks remain `not_run` unless explicitly requested and available; facts/business without explicit
 invariants remain `not_assessed`. These optional coverage gaps are disclosed,
 while an unassessed requested edit outcome always blocks a clean result. Explicit
 fields for contrast, keyboard, accessibility compliance, ranking, indexability,

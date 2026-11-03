@@ -1,0 +1,15 @@
+{
+  "authority": "Fictional Northstar product policy, fixture revision 2026-11-03; supplied authority for this demo only",
+  "facts": {
+    "starter-monthly-price": "$29.90",
+    "growth-monthly-price": "$69.90",
+    "starter-seats": "3",
+    "growth-seats": "15"
+  },
+  "required_routes": {
+    "starter-monthly-price": ["/", "/pricing", "/faq"],
+    "growth-monthly-price": ["/", "/pricing", "/faq"],
+    "starter-seats": ["/", "/pricing", "/faq"],
+    "growth-seats": ["/", "/pricing", "/faq"]
+  }
+}

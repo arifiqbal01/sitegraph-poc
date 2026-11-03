@@ -29,7 +29,7 @@ def connection():
     db.execute("CREATE INDEX IF NOT EXISTS edges_target ON edges(target)")
     return db
 def source_files():
-    return sorted(list(SITE.rglob("*.astro")) + list(KNOWLEDGE.rglob("*.md")))
+    return sorted(list(SITE.rglob("*.astro")) + list(KNOWLEDGE.rglob("*.md")) + list(KNOWLEDGE.rglob("*.json")))
 def rebuild():
     """Reparse changed files only; delete removed nodes; retain index on disk."""
     db = connection()
@@ -43,7 +43,7 @@ def rebuild():
         previous = db.execute("SELECT hash FROM nodes WHERE path=?", (key,)).fetchone()
         if previous and previous[0] == digest:
             continue
-        kind = "page" if path.suffix == ".astro" and "pages" in path.parts else ("knowledge" if path.suffix == ".md" else "component")
+        kind = "page" if path.suffix == ".astro" and "pages" in path.parts else ("knowledge" if path.suffix in {".md", ".json"} else "component")
         page_route = route(path) if kind == "page" else None
         db.execute("INSERT OR REPLACE INTO nodes VALUES(?,?,?,?,?)", (key,digest,page_route,kind,content))
         db.execute("DELETE FROM edges WHERE source=?", (key,))
