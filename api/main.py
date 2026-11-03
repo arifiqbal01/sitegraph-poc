@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
 from . import graph, workspace, ai, checkpoints
-app = FastAPI(title="SiteGraph Change Impact POC", version="0.7.0")
+app = FastAPI(title="SiteGraph Change Impact POC", version="0.7.1")
 
 class AgentProposal(BaseModel):
     agent: str = "sherpa-simulator"
@@ -61,6 +61,8 @@ def ai_plan(body: Request):
         terms = result.get("search_terms", [])
         evidence = {term: graph.search(term) for term in terms[:5] if isinstance(term, str) and term.strip()}
         return {"plan": result, "evidence": evidence, "graph": graph.rebuild(), "note": "Demo agent planner, not authoritative impact analysis"}
+    except ai.ModelRequestError as exc:
+        raise HTTPException(exc.status_code, detail=exc.detail)
     except Exception as exc:
         raise HTTPException(422, detail=str(exc))
 
@@ -68,6 +70,8 @@ def ai_plan(body: Request):
 def ai_draft(body: Request):
     try:
         return workspace.draft(body.description, change_id=body.change_id, implementation_contract=body.implementation_contract)
+    except ai.ModelRequestError as exc:
+        raise HTTPException(exc.status_code, detail=exc.detail)
     except Exception as exc:
         raise HTTPException(422, detail=str(exc))
 

@@ -6,7 +6,7 @@ import re
 import shutil
 import uuid
 from pathlib import Path
-from . import graph, ai
+from . import graph, ai, draft_context
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "demo-site" / "src"
 WORKSPACES = Path("/app/data/workspaces") if Path("/app").exists() else ROOT / ".sitegraph" / "workspaces"
@@ -23,8 +23,6 @@ def draft(description, change_id=None, implementation_contract=None):
     graph.rebuild()
     indexed = graph.snapshot()
     files = {str(p.relative_to(ROOT)):p.read_text() for p in sorted((SOURCE/"pages").rglob("*.astro"))}
-    if len(files) > MAX_FILES:
-        raise ValueError("Demo exceeds bounded edit scope")
     terms = description.split()
     matches = graph.search(next((x for x in terms if len(x)>4),"Starter"))
     context = {}
@@ -41,13 +39,17 @@ def draft(description, change_id=None, implementation_contract=None):
         if saved_contract is not None and implementation_contract is not None and saved_contract != implementation_contract:
             raise ValueError("Cannot override the analysis contract; create a new analysis")
         bound_contract = checkpoints.validate_contract(saved_contract if saved_contract is not None else implementation_contract, record["baseline"], impact["proposed_changes"])
-        if bound_contract:
-            context["implementation_contract"] = bound_contract
-        context["mandatory_impact_context"] = impact
-        context["instruction"] = "For navigation href changes, edit only explicitly targeted pages; related links are context, not mandatory edits. The explicit implementation_contract, if supplied, defines edit scope and preservation requirements. Related pricing references need updates only when a value change is explicitly authorized. Do not change prices or knowledge policy for a presentation-only request. Disclose unsupported knowledge edits."
+        files = draft_context.select_files(impact, bound_contract, files)
+        context = draft_context.compact(impact, bound_contract, record["baseline"])
 
-    planning = ai.plan(description,indexed,matches)
-    context.update(plan=planning, related_sources=graph.search(planning.get("entity", "Starter")))
+    if len(files) > MAX_FILES:
+        raise ValueError("Draft exceeds bounded edit scope")
+    # Preflight before either model call; preserve complete editable files and rules.
+    payload, input_summary = ai.editor_payload(description, files, context)
+    context = payload["impact_context"]
+    planner_graph = {"nodes": [{k: n[k] for k in ("file", "route", "kind") if k in n}
+                               for n in indexed["nodes"] if n["file"] in files], "edges": []}
+    planning = ai.plan(description, planner_graph, matches[:10])
     result = ai.propose_edits(description,files,context)
     edits = result.get("edits",[])
     if not isinstance(edits,list) or len(edits)>MAX_FILES:
@@ -58,6 +60,8 @@ def draft(description, change_id=None, implementation_contract=None):
     seen = set()
     for edit in edits:
         path = edit["path"]
+        if path not in files:
+            raise ValueError("Model proposed an edit outside the supplied target scope")
         target = allowed(path)
         content = edit["content"]
         if path in seen or not isinstance(content,str) or not content.strip() or len(content)>MAX_SIZE:
@@ -71,9 +75,9 @@ def draft(description, change_id=None, implementation_contract=None):
     id = uuid.uuid4().hex
     workspace = WORKSPACES / id
     workspace.mkdir(parents=True)
-    (workspace/"proposal.json").write_text(json.dumps({"description":description,"change_id":change_id,"implementation_contract":bound_contract,"plan":planning,"edits":prepared},indent=2))
+    (workspace/"proposal.json").write_text(json.dumps({"description":description,"change_id":change_id,"implementation_contract":bound_contract,"plan":planning,"input_summary":input_summary,"edits":prepared},indent=2))
     return {"draft_id":id,"status":"pending_review","change_id":change_id,"plan":planning,
-            "implementation_contract":bound_contract,
+            "implementation_contract":bound_contract,"input_summary":input_summary,
             "changes":[{"path":e["path"],"reason":e["reason"],"diff":e["diff"]} for e in prepared],
             "note":"No source files modified. Explicit apply is required."}
 def apply(id):
