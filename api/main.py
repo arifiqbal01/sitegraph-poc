@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
 from . import graph, workspace, ai, checkpoints
-app = FastAPI(title="SiteGraph Change Impact POC", version="0.6.1")
+app = FastAPI(title="SiteGraph Change Impact POC", version="0.7.0")
 
 class AgentProposal(BaseModel):
     agent: str = "sherpa-simulator"
@@ -15,6 +15,7 @@ class AgentProposal(BaseModel):
 class Verification(BaseModel):
     change_id: str
     draft_id: str
+    run_rendered: bool = False
 
 class Request(BaseModel):
     description: str
@@ -47,7 +48,7 @@ def impact_analyze(body: AgentProposal):
 @app.post("/impact/verify")
 def impact_verify(body: Verification):
     try:
-        return checkpoints.verify(body.change_id, body.draft_id)
+        return checkpoints.verify(body.change_id, body.draft_id, run_rendered=body.run_rendered)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc))
 

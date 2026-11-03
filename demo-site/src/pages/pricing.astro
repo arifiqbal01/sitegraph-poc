@@ -1,21 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-<Base title="Pricing">
-  <h1>Clear plans for growing teams</h1>
-  <p>Choose a plan that matches your work today. All prices shown in USD; subscription billing is monthly.</p>
-  <section aria-labelledby="starter-heading">
-    <h2 id="starter-heading">Starter</h2>
-    <p>Starter is $29.90 per month. Ideal for freelancers and teams beginning to centralize their operations.</p>
-    <ul><li>Up to three team members</li><li>Project tracking and task assignments</li><li>Basic client management</li><li>Email support</li></ul>
-    <a class="button" href="/faq">Starter plan questions</a>
-  </section>
-  <section aria-labelledby="growth-heading">
-    <h2 id="growth-heading">Growth</h2>
-    <p>Growth is $69.90 per month and adds expanded reporting and team collaboration.</p>
-    <ul><li>Up to fifteen team members</li><li>Advanced reporting dashboards</li><li>Reusable project templates</li><li>Priority email support</li></ul>
-  </section>
-  <h2>What happens when you upgrade?</h2>
-  <p>Your projects and client records stay in place. Contact our team before switching billing arrangements.</p>
-  <p>See the <a href="/faq">billing FAQ</a> for cancellation and renewal details.</p>
+<Base title="Pricing and plan comparison" description="Compare Northstar Starter and Growth plans, monthly USD pricing, seat limits, support and billing terms.">
+<p class="eyebrow">Simple monthly plans</p><h1>Clear plans for growing teams</h1><p class="lead">Choose the workspace your delivery team needs today. All prices are in USD, billed monthly; applicable taxes are calculated separately.</p>
+<div class="grid"><section class="plan" aria-labelledby="starter-heading"><h2 id="starter-heading">Starter</h2><p>For independent teams bringing their first repeatable workflow together.</p><p class="price"><span data-fact="starter-monthly-price">$29.90</span><small> / month</small></p><p>Includes <span data-fact="starter-seats">3</span> team members.</p><ul><li>Up to three team members</li><li>Project tracking and task assignments</li><li>Basic client management</li><li>Email support</li></ul><a class="button" href="/faq">Starter plan questions</a></section>
+<section class="plan" aria-labelledby="growth-heading"><h2 id="growth-heading">Growth</h2><p>For delivery teams coordinating more clients and recurring work.</p><p class="price"><span data-fact="growth-monthly-price">$69.90</span><small> / month</small></p><p>Includes up to <span data-fact="growth-seats">15</span> team members.</p><ul><li>Up to fifteen team members</li><li>Advanced reporting dashboards</li><li>Reusable project templates</li><li>Priority email support</li></ul><a href="/contact">Discuss Growth with our team</a></section></div>
+<section><h2>Compare what is included</h2><div class="table-wrap"><table><caption>Monthly subscription features</caption><thead><tr><th scope="col">Capability</th><th scope="col">Starter</th><th scope="col">Growth</th></tr></thead><tbody><tr><th scope="row">Projects and task assignments</th><td>Included</td><td>Included</td></tr><tr><th scope="row">Client notes and contact records</th><td>Included</td><td>Included</td></tr><tr><th scope="row">Advanced reporting</th><td>Not included</td><td>Included</td></tr><tr><th scope="row">Reusable templates</th><td>Not included</td><td>Included</td></tr></tbody></table></div></section>
+<section><h2>Billing without surprises</h2><p>Cancel before your next renewal to prevent the following charge. Access continues through the current paid period. Annual billing and a free trial are not offered in this demonstration product policy.</p><h2>What happens when you upgrade?</h2><p>Your projects and client records stay in place. Contact our team before switching billing arrangements. Onboarding services are quoted separately and are not included in either subscription.</p><p>See the <a href="/faq">billing FAQ</a> or read our <a href="/privacy">data handling policy</a>.</p></section>
 </Base>

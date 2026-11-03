@@ -3,7 +3,7 @@ import json
 import re
 import uuid
 from pathlib import Path
-from . import graph, contracts, investigations
+from . import graph, contracts, investigations, rendered
 from .engine import links
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -12,7 +12,7 @@ PAGES = ROOT / "demo-site" / "src" / "pages"
 KNOWLEDGE = ROOT / "knowledge"
 
 def _files():
-    return {str(p.relative_to(ROOT)): p.read_text() for p in sorted(list(PAGES.rglob("*.astro")) + list(KNOWLEDGE.rglob("*.md")))}
+    return {str(p.relative_to(ROOT)): p.read_text() for p in sorted(list(PAGES.rglob("*.astro")) + list(KNOWLEDGE.rglob("*.md")) + list(KNOWLEDGE.rglob("*.json")))}
 
 def _route(path):
     rel = Path(path).relative_to("demo-site/src/pages").with_suffix("")
@@ -94,7 +94,7 @@ def analyze(proposal):
     if any(t in all_text for t in ("button", "form", "layout", "cta", "design")): categories.add("accessibility")
     checks = ["Check confirmed references for incomplete edits", "Review unexpected file changes"]
     if "navigation" in categories: checks += ["Check internal destinations and inbound links", "Review redirects and canonical URLs"]
-    if "accessibility" in categories: checks += ["Run rendered accessibility checks (not implemented in POC)"]
+    if "accessibility" in categories: checks += ["Run opt-in isolated rendered SEO/accessibility/fact checks"]
     change_id = uuid.uuid4().hex
     report = {"change_id": change_id, "checkpoint": "pre_implementation", "trigger": proposal.get("trigger", "agent_discovery"),
               "agent": proposal.get("agent", "external_agent"), "original_request": proposal.get("original_request"),
@@ -107,7 +107,7 @@ def analyze(proposal):
     report["impact_investigations"] = investigations.plan(proposal, matches)
     report["implementation_brief"] = implementation_brief(proposal, baseline)
     STORE.mkdir(parents=True, exist_ok=True)
-    (STORE / (change_id + ".json")).write_text(json.dumps({"report": report, "baseline": baseline}, indent=2))
+    (STORE / (change_id + ".json")).write_text(json.dumps({"report": report, "baseline": baseline, "render_snapshot": rendered.snapshot(ROOT)}, indent=2))
     return report
 
 def load(change_id):
@@ -118,7 +118,7 @@ def load(change_id):
         raise ValueError("Unknown change_id")
     return json.loads(path.read_text())
 
-def verify(change_id, draft_id):
+def verify(change_id, draft_id, run_rendered=False):
     record = load(change_id)
     before = record["baseline"]
     report = record["report"]
@@ -254,7 +254,17 @@ def verify(change_id, draft_id):
     unresolved = [x for x in checks if x["status"] in ("missed", "needs_review")]
     missing_destinations = [x for x in destination_checks if x["status"] == "missing"]
     decision = "review_required" if unresolved or unexpected or removed_links or missing_destinations or coverage_gaps or failed_contract or source_regressions or missing_pages or unresolved_scope else "no_detected_blockers"
+    runtime = {"status": "not_run", "detail": "Opt-in rendered checks were not requested."}
+    if run_rendered:
+        runtime = rendered.verify(record, preview, [_route(p) for p in before if p.startswith("demo-site/src/pages/")])
+        if runtime["status"] != "completed":
+            decision = "review_required"
+        for item in inspection:
+            if item["check"] in {"rendered_accessibility", "runtime_seo"}:
+                item["status"] = runtime.get("domain_results", {}).get(item["domain"], {}).get("status", runtime["status"])
+                item["detail"] = "See rendered_verification for executed checks, evidence and limitations."
     return {"change_id": change_id, "draft_id": draft_id, "checkpoint": "pre_publish",
+            "rendered_verification": runtime,
             "original_proposal": report["proposed_changes"], "affected_routes": report["affected_routes"],
             "changed_files": changed, "changed_routes": sorted(_route(p) for p in changed if p.endswith(".astro")),
             "reference_checks": checks, "missed_references": unresolved, "destination_checks": destination_checks,
@@ -264,8 +274,9 @@ def verify(change_id, draft_id):
             "missing_preview_files": missing_pages,
             "human_report": {
                 "decision": decision,
+                "rendered_status": runtime["status"],
                 "verified": [c["id"] for c in contract_checks if c["status"] == "passed"],
-                "requires_review": [c["id"] for c in failed_contract] + [c["detail"] for c in coverage_gaps]
+                "requires_review": (["Rendered verification: " + runtime["status"]] if run_rendered and runtime["status"] != "completed" else []) + [e["domain"] + ": " + e["code"] + " on " + e["route"] for e in runtime.get("evidence", [])] + [c["id"] for c in failed_contract] + [c["detail"] for c in coverage_gaps]
                                    + ["Unresolved reference: " + c["file"] for c in unresolved]
                                    + ["Unexpected edit: " + p for p in unexpected]
                                    + ["Missing preview file: " + p for p in missing_pages]
@@ -273,10 +284,10 @@ def verify(change_id, draft_id):
                                    + ["Missing destination: " + c["destination"] for c in missing_destinations]
                                    + ["Removed link: " + c["removed_destination"] for c in removed_links]
                                    + [e["detail"] for result in source_regressions for e in result["evidence"]],
-                "not_assessed": [x["detail"] for x in inspection if x["status"] in ("not_run", "not_assessed")],
-                "scope": "Source evidence only; business approval and publication remain human decisions."
+                "not_assessed": [x["detail"] for x in inspection if x["status"] in ("not_run", "not_assessed", "unavailable")] + runtime.get("limitations", []),
+                "scope": "Source assertions plus separately reported opt-in rendered evidence; business approval and publication remain human decisions."
             },
             "unexpected_changes": unexpected,
             "removed_internal_links": removed_links, "decision": decision, "read_only": True,
             "summary": f"{len(changed)} files modified; {len(unresolved)} unresolved references; {len(unexpected)} unexpected files; {len(removed_links)} unapproved removed internal links; {len(missing_destinations)} missing destinations; {len(coverage_gaps)} unassessed outcomes; {len(failed_contract)} unresolved contract checks; {len(unresolved_scope)} unresolved scope checks; {len(source_regressions)} investigation groups requiring review; {len(missing_pages)} missing preview files.",
-            "limitations": ["Static source checks only; browser behavior, accessibility, live routes, SEO outcomes and external knowledge are not verified.", "No publication performed."]}
+            "limitations": (["Browser checks were not requested; source checks only."] if not run_rendered else runtime.get("limitations", [runtime.get("detail", "Rendered evidence unavailable.")])) + ["External billing, real-world truth, search outcomes and publication are not verified.", "No publication performed."]}

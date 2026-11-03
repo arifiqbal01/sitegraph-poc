@@ -1,0 +1,5 @@
+# Opt in: docker compose -f compose.yaml -f compose.rendered.yaml up -d --build impact
+services:
+  impact:
+    build:
+      dockerfile: Dockerfile.rendered

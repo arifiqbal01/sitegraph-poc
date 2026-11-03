@@ -1,4 +1,25 @@
-# v0.6 evaluation
+# v0.7 evaluation
+
+Current procedure and boundaries: [rendered-demo.md](rendered-demo.md).
+The historical record below describes v0.6 only and is superseded for current
+rendered capabilities. Source-only defaults and explicit contracts are preserved.
+
+## Current validation
+
+- 74 Python tests cover existing source behavior, frozen supporting files,
+  separate candidate staging, old snapshot refusal and browser failure propagation.
+- The expanded nine-page site builds with Astro; pricing layout inspected at
+  desktop and mobile widths.
+- Five deterministic source scenarios pass expected decision checks.
+- Browser scenario results and exact versions are recorded in
+  [v0.7-validation.md](v0.7-validation.md).
+- Browser CI runs the same five cases and uploads verification reports.
+- No live model, external website, production publication or Sherpa integration
+  is required or claimed. Optional Docker image execution is separately disclosed.
+
+---
+
+# Historical v0.6 evaluation
 
 The central regression reproduces a vague pricing-presentation proposal followed
 by a CTA edit. Changed-file presence must not be mistaken for intent verification.

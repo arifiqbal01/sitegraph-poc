@@ -3,7 +3,7 @@ from api.engine import analyze, verify
 P = {"description":"Reduce Starter price from $29.90 to $19.90","type":"pricing","entity":"Starter","old_value":"$29.90","new_value":"$19.90","scenario":"pricing-incomplete"}
 class EngineTests(unittest.TestCase):
     def test_pre_change(self):
-        self.assertEqual({x["route"] for x in analyze(P)["related_pages"]}, {"/", "/pricing", "/faq"})
+        self.assertEqual({x["route"] for x in analyze(P)["related_pages"]}, {"/", "/pricing", "/faq", "/resources", "/contact", "/integrations"})
     def test_incomplete(self):
         self.assertTrue(any(f["route"] == "/faq" and f["status"] == "needs_review" for f in verify(P)["findings"]))
     def test_complete(self):

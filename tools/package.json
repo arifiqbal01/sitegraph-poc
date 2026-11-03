@@ -1,0 +1,1 @@
+{"name":"sitegraph-rendered-checks","private":true,"type":"module","scripts":{"browser:install":"playwright install chromium"},"dependencies":{"playwright":"1.58.2","axe-core":"4.11.1"}}

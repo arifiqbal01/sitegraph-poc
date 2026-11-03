@@ -1,4 +1,13 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-<Base title="FAQ"><h1>Frequently asked questions</h1><h2>How much does Starter cost?</h2><p>Starter costs $29.90 per month.</p><a href="/pricing">Compare plans</a></Base>
+<Base title="Frequently asked questions" description="Answers about Northstar pricing, team limits, cancellation, onboarding and integrations.">
+<p class="eyebrow">Help before you choose</p><h1>Frequently asked questions</h1><p class="lead">Practical answers about subscriptions, daily delivery and getting your team started.</p>
+<details open><summary>How much does Starter cost?</summary><p>Starter costs <span data-fact="starter-monthly-price">$29.90</span> per month, billed monthly in USD. Taxes, where applicable, are separate.</p></details>
+<details open><summary>Can I invite teammates?</summary><p>Starter includes <span data-fact="starter-seats">3</span> members. Growth includes up to <span data-fact="growth-seats">15</span> members at <span data-fact="growth-monthly-price">$69.90</span> per month. A member is a person with workspace access, including the owner.</p></details>
+<details><summary>Can I cancel my subscription?</summary><p>Cancel before your next renewal date to avoid the following charge. Your workspace remains available through your current paid period. Cancellation does not automatically delete stored data.</p></details>
+<details><summary>Is there an annual discount or free trial?</summary><p>No. The current policy provides monthly subscriptions only, with no free trial. Review the <a href="/pricing">pricing comparison</a> for the included features.</p></details>
+<details><summary>Do you offer onboarding support?</summary><p>Our <a href="/services">services team</a> offers separately scoped workflow setup and search visibility support. An onboarding engagement includes a discovery session, a configured example workflow and handover notes.</p></details>
+<details><summary>How do integrations work?</summary><p>CSV import and export support controlled data transfer. Other directory entries describe planned or illustrative workflows; they are not a promise of a live connector. See <a href="/integrations">integration availability</a>.</p></details>
+<details><summary>Can I export my records?</summary><p>Both plans support CSV export of projects and client records. Check our <a href="/privacy">data policy</a> for deletion and retention terms.</p></details><p>Still have a question? <a href="/contact">Contact the team</a>.</p>
+</Base>

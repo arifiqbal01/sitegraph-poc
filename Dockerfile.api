@@ -3,7 +3,7 @@ WORKDIR /app
 COPY api/requirements.txt /app/api/requirements.txt
 RUN pip install --no-cache-dir -r /app/api/requirements.txt
 COPY api/ /app/api/
-COPY demo-site/src/ /app/demo-site/src/
+COPY demo-site/ /app/demo-site/
 COPY scenarios/ /app/scenarios/
 COPY knowledge/ /app/knowledge/
 RUN mkdir -p /app/data
