@@ -67,7 +67,8 @@ class WorkflowTests(unittest.TestCase):
         fixture=self.fixture();raw=raw_proposal(fixture)
         raw['verification_contract']['checks'][0]['kind']='make_site_safe'
         report=cp.analyze(self.propose(fixture,raw))
-        self.assertIsNone(report['suggestion_expectations'])
+        self.assertTrue(report['suggestion_expectations']['checks'])
+        self.assertNotIn('make_site_safe', {c['kind'] for c in report['suggestion_expectations']['checks']})
         self.assertTrue(report['suggestion_expectation_errors'])
         result=fixture.verify(report,{PRICING:fixture.candidate()})
         self.assertEqual(result['decision'],'review_required')

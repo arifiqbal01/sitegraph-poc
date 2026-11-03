@@ -41,6 +41,8 @@ def draft(description, change_id=None, implementation_contract=None):
         bound_contract = checkpoints.validate_contract(saved_contract if saved_contract is not None else implementation_contract, record["baseline"], impact["proposed_changes"])
         files = draft_context.select_files(impact, bound_contract, files)
         context = draft_context.compact(impact, bound_contract, record["baseline"])
+        # Isolation is owned by this module, never a requested website feature.
+        description = (impact.get("original_request") or description) + "\nImplement the saved proposed_changes in the supplied existing pages. Workspace isolation is already handled; do not add draft routes, feature flags, navigation placeholders or documentation unless requested by the saved changes.\n" + json.dumps(impact["proposed_changes"], ensure_ascii=False)
 
     if len(files) > MAX_FILES:
         raise ValueError("Draft exceeds bounded edit scope")

@@ -1,4 +1,5 @@
 """Explicit caller-supplied acceptance checks; model prose is never authorization."""
+import re
 from .source import SourceTree
 
 KINDS = {'text_equals', 'attribute_equals', 'element_unchanged', 'literal_preserved', 'file_unchanged'}
@@ -6,7 +7,7 @@ OUTCOMES = {'text_equals', 'attribute_equals'}
 
 
 def _locator(value, nested=False):
-    if not isinstance(value, dict) or not isinstance(value.get('tag'), str) or not value['tag'].isascii() or not value['tag'].isalpha():
+    if not isinstance(value, dict) or not isinstance(value.get('tag'), str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9]*', value['tag']):
         raise ValueError('Contract locator requires a literal HTML tag')
     if set(value) - {'tag', 'attributes', 'within'}:
         raise ValueError('Unknown locator fields')
