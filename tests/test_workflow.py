@@ -4,7 +4,7 @@ import json
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from api import ai, suggestions, safeguards, workflow, checkpoints as cp, workspace
+from api import ai, suggestions, safeguards, workflow, checkpoints as cp, workspace, reasoning
 import test_outcomes as outcomes
 from test_outcomes import PRICING
 
@@ -29,6 +29,12 @@ def raw_proposal(fixture, price=False, question=False):
 class WorkflowTests(unittest.TestCase):
     def fixture(self):
         fixture=outcomes.OutcomeTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
+        brief=patch.object(reasoning,'implementation_brief',return_value={
+            'status':'completed','advisory_only':True,'investigations':[],'uncertainties':[]})
+        brief.start();self.addCleanup(brief.stop)
+        transport=patch.object(ai.request,'urlopen',side_effect=AssertionError('Unexpected provider call in workflow test'))
+        mocked=transport.start();self.addCleanup(transport.stop)
+        self.addCleanup(lambda: self.assertEqual(mocked.call_count,0))
         return fixture
 
     def propose(self, fixture, raw=None):
